@@ -18,8 +18,19 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { roadmapFamilies, roadmapTracks, type RoadmapNode, type RoadmapTrack } from "./career-roadmaps-data";
+import { conceptsOf, roadmapFamilies, roadmapTracks, type RoadmapNode, type RoadmapTrack } from "./career-roadmaps-data";
+import {
+  DEFAULT_AVATAR,
+  RoadmapAvatarPicker,
+  RoadmapRaceTrack,
+  RoadmapStepList,
+  RoadmapViewToggle,
+  type PathItem,
+  type PathView,
+  type RoadmapAvatar,
+} from "./roadmap-path";
 
 type DetailTab = "Learn" | "Practice" | "Interview" | "Project" | "Revision";
 type TrackTab = "Overview" | "Projects" | "Interview" | "Companies";
@@ -34,6 +45,10 @@ export function CareerRoadmapsSection({ onAction }: { onAction: (message: string
   const [family, setFamily] = useState<(typeof roadmapFamilies)[number]>("All");
   const [query, setQuery] = useState("");
   const [trackTab, setTrackTab] = useState<TrackTab>("Overview");
+  const [pathView, setPathView] = useState<PathView>("Track");
+  const [avatar, setAvatar] = useState<RoadmapAvatar>(DEFAULT_AVATAR);
+  /** Kept out of the track component, which unmounts whenever a milestone page opens. */
+  const [markerByTrack, setMarkerByTrack] = useState<Record<string, number>>({});
   const [detailNode, setDetailNode] = useState<RoadmapNode | null>(null);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [started, setStarted] = useState<Set<string>>(new Set());
@@ -91,6 +106,7 @@ export function CareerRoadmapsSection({ onAction }: { onAction: (message: string
 
   const completedCount = selected.nodes.filter((node) => completed.has(nodeKey(selected.id, node.label))).length;
   const nextNode = selected.nodes.find((node) => statusOf(node) !== "Completed") ?? selected.nodes[0];
+  const pathItems: PathItem[] = selected.nodes.map((node) => ({ node, status: statusOf(node), concepts: conceptsOf(node) }));
 
   return (
     <section className="min-w-0 space-y-4">
@@ -151,31 +167,31 @@ export function CareerRoadmapsSection({ onAction }: { onAction: (message: string
       </section>
 
       <section className="border-y bg-white">
-        <div className="flex items-center justify-between gap-3 border-b px-4 py-3 sm:px-5">
-          <div><h3 className="font-semibold">Learning path</h3><p className="text-sm text-muted-foreground">Open a milestone for focused learning and practice.</p></div>
-          <span className="hidden text-sm text-muted-foreground sm:block">{completedCount} of {selected.nodes.length} complete</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-5">
+          <div className="min-w-0">
+            <h3 className="font-semibold">Learning path</h3>
+            <p className="text-sm text-muted-foreground">Follow the track checkpoint by checkpoint, or switch to the step list.</p>
+            <div className="mt-2 flex items-center gap-2">
+              <Progress className="h-2 w-40" value={(completedCount / selected.nodes.length) * 100} />
+              <span className="text-xs text-muted-foreground">{completedCount} of {selected.nodes.length} complete</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {pathView === "Track" ? <RoadmapAvatarPicker avatar={avatar} onChange={setAvatar} /> : null}
+            <RoadmapViewToggle view={pathView} onChange={setPathView} />
+          </div>
         </div>
-        <ol>
-          {selected.nodes.map((node, index) => {
-            const status = statusOf(node);
-            return (
-              <li key={node.label} className="border-b last:border-b-0">
-                <button
-                  className={cn("grid w-full gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/60 sm:px-5 md:grid-cols-[44px_180px_minmax(0,1fr)_110px_20px] md:items-center", status === "In progress" && "bg-primary/5")}
-                  onClick={() => openNode(node)}
-                >
-                  <span className={cn("flex h-8 w-8 items-center justify-center rounded-md border text-sm font-bold", status === "Completed" && "border-secondary bg-secondary text-white", status === "In progress" && "border-primary bg-primary text-white")}>
-                    {status === "Completed" ? <Check className="h-4 w-4" /> : index + 1}
-                  </span>
-                  <span className="font-semibold">{node.label}</span>
-                  <span className="line-clamp-2 text-sm text-muted-foreground">{node.summary}</span>
-                  <Badge variant={status === "Completed" ? "secondary" : status === "In progress" ? "warning" : "outline"}>{status}</Badge>
-                  <ChevronRight className="hidden h-4 w-4 text-muted-foreground md:block" />
-                </button>
-              </li>
-            );
-          })}
-        </ol>
+        {pathView === "Track"
+          ? (
+            <RoadmapRaceTrack
+              items={pathItems}
+              onOpen={openNode}
+              avatar={avatar}
+              markerAt={markerByTrack[selected.id] ?? -1}
+              onMarkerArrive={(index) => setMarkerByTrack((prev) => ({ ...prev, [selected.id]: index }))}
+            />
+          )
+          : <RoadmapStepList items={pathItems} onOpen={openNode} />}
       </section>
 
       <section className="border-y bg-white">
@@ -221,7 +237,7 @@ function RoadmapNodePage({ track, node, status, onAction, onComplete, onBack }: 
   const [tab, setTab] = useState<DetailTab>("Learn");
   const index = track.nodes.findIndex((item) => item.label === node.label);
   const previous = index > 0 ? track.nodes[index - 1] : null;
-  const concepts = node.summary.split(", ").map((item) => item.replace(" and ", ", ")).flatMap((item) => item.split(", ")).map((item) => item.trim()).filter(Boolean);
+  const concepts = conceptsOf(node);
 
   return (
     <article className="min-w-0 bg-white">

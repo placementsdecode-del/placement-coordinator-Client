@@ -18,6 +18,15 @@ export type RoadmapTrack = {
   questions: string[];
 };
 
+export function conceptsOf(node: RoadmapNode) {
+  return node.summary
+    .split(", ")
+    .map((item) => item.replace(" and ", ", "))
+    .flatMap((item) => item.split(", "))
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 const track = (
   id: string,
   title: string,
