@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   BarChart3,
   ClipboardList,
@@ -25,6 +25,8 @@ import {
   adminTasks,
   coordinatorRoles,
 } from "@/data/admin";
+import { createUser, listUsers } from "@/services/users.service";
+import type { ApiUser } from "@/types/api";
 import type {
   AdminAssessment,
   AdminNavLabel,
@@ -34,11 +36,21 @@ import type {
   CoordinatorRow,
   SectionRow,
 } from "@/types/admin";
+import type { SessionUser } from "@/types/auth";
 
-export function AdminSection({ activeNav, onAction }: { activeNav: AdminNavLabel; onAction: (message: string) => void }) {
+export function AdminSection({
+  activeNav,
+  currentUser,
+  onAction,
+}: {
+  activeNav: AdminNavLabel;
+  currentUser: SessionUser | null;
+  onAction: (message: string) => void;
+}) {
   const [sections, setSections] = useState<SectionRow[]>(adminSections);
   const [students, setStudents] = useState<AdminStudentRow[]>(adminStudents);
   const [coordinators, setCoordinators] = useState<CoordinatorRow[]>(adminCoordinators);
+  const [organizationUsers, setOrganizationUsers] = useState<ApiUser[]>([]);
   const [roles, setRoles] = useState<CoordinatorRole[]>(coordinatorRoles);
   const [tasks, setTasks] = useState<AdminTask[]>(adminTasks);
   const [assessments, setAssessments] = useState<AdminAssessment[]>(adminAssessments);
@@ -47,6 +59,19 @@ export function AdminSection({ activeNav, onAction }: { activeNav: AdminNavLabel
 
   const selectedSection = sections.find((section) => section.id === selectedSectionId) ?? sections[0];
   const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? students[0];
+
+  const refreshOrganizationUsers = useCallback(async () => {
+    try {
+      const users = await listUsers(currentUser?.organization);
+      setOrganizationUsers(users);
+    } catch {
+      setOrganizationUsers([]);
+    }
+  }, [currentUser?.organization]);
+
+  useEffect(() => {
+    refreshOrganizationUsers();
+  }, [refreshOrganizationUsers]);
 
   function createSection(section: SectionRow) {
     setSections((items) => [section, ...items]);
@@ -62,6 +87,22 @@ export function AdminSection({ activeNav, onAction }: { activeNav: AdminNavLabel
   function addCoordinator(coordinator: CoordinatorRow) {
     setCoordinators((items) => [coordinator, ...items]);
     onAction("Coordinator added.");
+  }
+
+  async function createOrganizationUser(user: {
+    name: string;
+    email: string;
+    phoneNumber: string;
+    roleName: "teacher" | "student" | "admin";
+    password?: string;
+  }) {
+    try {
+      const response = await createUser(user);
+      await refreshOrganizationUsers();
+      onAction(response.temporaryPassword ? `User created. Temporary password: ${response.temporaryPassword}` : response.message || "User created.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "User creation failed.");
+    }
   }
 
   function addRole(role: CoordinatorRole) {
@@ -107,7 +148,17 @@ export function AdminSection({ activeNav, onAction }: { activeNav: AdminNavLabel
   }
 
   if (activeNav === "Coordinators") {
-    return <CoordinatorsAdmin coordinators={coordinators} roles={roles} sections={sections} onAddCoordinator={addCoordinator} onAddRole={addRole} />;
+    return (
+      <CoordinatorsAdmin
+        coordinators={coordinators}
+        organizationUsers={organizationUsers}
+        roles={roles}
+        sections={sections}
+        onAddCoordinator={addCoordinator}
+        onAddRole={addRole}
+        onCreateOrganizationUser={createOrganizationUser}
+      />
+    );
   }
 
   if (activeNav === "Tasks") {
@@ -508,19 +559,31 @@ function CreateSectionForm({ onCreateSection }: { onCreateSection: (section: Sec
 
 function CoordinatorsAdmin({
   coordinators,
+  organizationUsers,
   roles,
   sections,
   onAddCoordinator,
   onAddRole,
+  onCreateOrganizationUser,
 }: {
   coordinators: CoordinatorRow[];
+  organizationUsers: ApiUser[];
   roles: CoordinatorRole[];
   sections: SectionRow[];
   onAddCoordinator: (coordinator: CoordinatorRow) => void;
   onAddRole: (role: CoordinatorRole) => void;
+  onCreateOrganizationUser: (user: {
+    name: string;
+    email: string;
+    phoneNumber: string;
+    roleName: "teacher" | "student" | "admin";
+    password?: string;
+  }) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [password, setPassword] = useState("");
   const [role, setRole] = useState(roles[0]?.name ?? "");
   const [section, setSection] = useState(sections[0]?.name ?? "");
   const [roleName, setRoleName] = useState("");
@@ -548,18 +611,28 @@ function CoordinatorsAdmin({
                   id: crypto.randomUUID(),
                   name: name || "New Coordinator",
                   email: email || "coordinator@example.edu",
-                  phone: "+91 90000 00000",
+                  phone: phoneNumber || "+91 90000 00000",
                   role,
                   sections: [section],
                   status: "Active",
                 });
+                onCreateOrganizationUser({
+                  name: name || "New Coordinator",
+                  email: email || "coordinator@example.edu",
+                  phoneNumber: phoneNumber || "+91 90000 00000",
+                  roleName: "teacher",
+                  password: password.trim() || undefined,
+                });
                 setName("");
                 setEmail("");
+                setPhoneNumber("");
+                setPassword("");
               }}
             >
               <Input placeholder="Coordinator name" value={name} onChange={(event) => setName(event.target.value)} />
               <Input placeholder="Email address" value={email} onChange={(event) => setEmail(event.target.value)} />
-              <Input placeholder="Phone number" />
+              <Input placeholder="Phone number" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} />
+              <Input placeholder="Password optional" value={password} onChange={(event) => setPassword(event.target.value)} />
               <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={role} onChange={(event) => setRole(event.target.value)}>
                 {roles.map((item) => <option key={item.id}>{item.name}</option>)}
               </select>
@@ -611,6 +684,15 @@ function CoordinatorsAdmin({
                   <Badge variant="secondary">{coordinator.role}</Badge>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{coordinator.email} · {coordinator.sections.join(", ")}</p>
+              </div>
+            ))}
+            {organizationUsers.filter((user) => user.role === "teacher").map((user) => (
+              <div key={user.id} className="rounded-lg border p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold">{user.name}</p>
+                  <Badge variant="secondary">Teacher</Badge>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">{user.email} · API user</p>
               </div>
             ))}
           </CardContent>

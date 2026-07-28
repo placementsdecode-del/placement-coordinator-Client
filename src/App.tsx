@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { LandingScreen } from "@/components/layout/landing-screen";
 import { LoginScreen } from "@/components/layout/login-screen";
@@ -16,12 +16,15 @@ import { DashboardSection } from "@/sections/dashboard/dashboard-section";
 import { HomeworkSection } from "@/sections/homework/homework-section";
 import { PreparationProgressSection } from "@/sections/preparation-progress/preparation-progress-section";
 import { ProfileSection } from "@/sections/profile/profile-section";
+import { OrganizationRegistrationPage } from "@/pages/public/organization-registration";
 import { ResultsSection } from "@/sections/results/results-section";
 import { SelfAssessmentSection } from "@/sections/self-assessment/self-assessment-section";
 import { StudyMaterialsSection } from "@/sections/study-materials/study-materials-section";
 import { SuperAdminSection } from "@/sections/super-admin/super-admin-section";
 import type { AdminNavLabel } from "@/types/admin";
-import type { UserRole } from "@/types/auth";
+import { getCurrentUser, login as loginWithCredentials } from "@/services/auth.service";
+import { clearAccessToken, getAccessToken, setAccessToken } from "@/services/api-client";
+import { type SessionUser, type UserRole, toAppRole } from "@/types/auth";
 import type { SuperAdminNavLabel } from "@/types/super-admin";
 import type { AnnouncementItem, AssessmentItem, HomeworkItem, NavLabel, TaskItem } from "@/types/student";
 
@@ -43,9 +46,11 @@ function pathForRole(role: UserRole) {
 
 function App() {
   const initialRouteRole = roleFromPath();
-  const [isLoggedIn, setIsLoggedIn] = useState(Boolean(initialRouteRole));
+  const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getAccessToken() && initialRouteRole));
   const [showLogin, setShowLogin] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>(initialRouteRole ?? "student");
+  const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
+  const [showRegistration, setShowRegistration] = useState(window.location.pathname === "/register-organization");
   const [activeNav, setActiveNav] = useState<NavLabel>("Dashboard");
   const [activeAdminNav, setActiveAdminNav] = useState<AdminNavLabel>("Dashboard");
   const [activeSuperAdminNav, setActiveSuperAdminNav] = useState<SuperAdminNavLabel>("Dashboard");
@@ -61,6 +66,27 @@ function App() {
   function showToast(message: string) {
     setToastMessage(message);
   }
+
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token) return;
+
+    getCurrentUser()
+      .then((user) => {
+        const appRole = toAppRole(user.role);
+        setCurrentUser({ ...user, appRole });
+        setUserRole(appRole);
+        setIsLoggedIn(true);
+        setShowRegistration(false);
+        if (!roleFromPath()) window.history.replaceState({}, "", pathForRole(appRole));
+      })
+      .catch(() => {
+        clearAccessToken();
+        setIsLoggedIn(false);
+        setCurrentUser(null);
+        if (window.location.pathname !== "/register-organization") window.history.replaceState({}, "", "/");
+      });
+  }, []);
 
   function handleTaskAction(title: string) {
     setTaskItems((items) =>
@@ -93,19 +119,27 @@ function App() {
     showToast("All announcements marked read.");
   }
 
-  function loginAs(role: UserRole) {
-    setUserRole(role);
+  async function login(email: string, password: string) {
+    const response = await loginWithCredentials(email, password);
+    const appRole = toAppRole(response.user.role);
+    setAccessToken(response.token);
+    setCurrentUser({ ...response.user, appRole });
+    setUserRole(appRole);
     setIsLoggedIn(true);
+    setShowRegistration(false);
     setMobileMenuOpen(false);
     setActiveNav("Dashboard");
     setActiveAdminNav("Dashboard");
     setActiveSuperAdminNav("Dashboard");
-    window.history.pushState({}, "", pathForRole(role));
+    window.history.pushState({}, "", pathForRole(appRole));
   }
 
   function logout() {
+    clearAccessToken();
+    setCurrentUser(null);
     setIsLoggedIn(false);
     setShowLogin(false);
+    setShowRegistration(false);
     setMobileMenuOpen(false);
     window.history.pushState({}, "", "/");
   }
@@ -148,9 +182,31 @@ function App() {
   }
 
   if (!isLoggedIn) {
-    if (showLogin) {
-      return <LoginScreen onLogin={loginAs} onBack={() => setShowLogin(false)} />;
+    if (showRegistration) {
+      return (
+        <OrganizationRegistrationPage
+          onBack={() => {
+            setShowRegistration(false);
+            window.history.pushState({}, "", "/");
+          }}
+        />
+      );
     }
+
+    if (showLogin) {
+      return (
+        <LoginScreen
+          onLogin={login}
+          onBack={() => setShowLogin(false)}
+          onOpenRegistration={() => {
+            setShowRegistration(true);
+            setShowLogin(false);
+            window.history.pushState({}, "", "/register-organization");
+          }}
+        />
+      );
+    }
+
     return <LandingScreen onEnterDemo={() => setShowLogin(true)} />;
   }
 
@@ -183,7 +239,7 @@ function App() {
         onLogout={logout}
         onDismissToast={() => setToastMessage("")}
       >
-        <AdminSection activeNav={activeAdminNav} onAction={showToast} />
+        <AdminSection activeNav={activeAdminNav} currentUser={currentUser} onAction={showToast} />
       </AdminShell>
     );
   }

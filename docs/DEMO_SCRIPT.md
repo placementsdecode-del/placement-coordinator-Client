@@ -1,11 +1,7 @@
 # PlacePrep — Guided Demo Script
 
-A click-by-click walkthrough for pitching the product live in ~2–4 minutes. Everything runs on mock data, so it
-never fails on a network call. No credentials are needed — the landing page and login screen both have one-click
-entry.
-
-> **Password for any demo account (if you ever type it manually):** `123456`
-> Accounts: `student@gmail.com`, `admin@gmail.com`, `superadmin@gmail.com`
+A click-by-click walkthrough for pitching the product live in ~2–4 minutes. Sign in with a provisioned API account
+for the role you want to show.
 
 ---
 
@@ -25,7 +21,7 @@ entry.
 > else — with no idea if they're actually ready. PlacePrep puts learning, practice, and placement tracking in one
 > workspace, for students *and* the coordinators who run the program."
 
-- Point to the hero stat tiles: **40+ study guides, career roadmaps, 3 role-based portals, 8 categories.**
+- Point to the hero stat tiles: **40+ study guides, career roadmaps, subject categories, and staged learning.**
 - Scroll to **"A deep library, not a link list"** — highlight the category chips and subject chips.
   > "Every subject is a full staged curriculum — not a bookmark."
 
@@ -33,7 +29,7 @@ entry.
 
 ## 2. Student experience — 90s
 
-Click **"Launch student demo"** (hero or role card).
+Click **Sign in** and authenticate with a student account.
 
 1. **Dashboard** — "Riya's placement prep is 78% complete." Point to: readiness donut, coordinator feedback,
    today's task bar, skill performance.
@@ -52,7 +48,7 @@ Click **"Launch student demo"** (hero or role card).
 
 ## 3. Coordinator / Admin experience — 45s
 
-Click **Logout** → on the landing page click the **Organization Admin** role card (or Sign in → Admin quick-login).
+Click **Logout** → **Sign in** with an organization admin account.
 
 - **Dashboard** — org-wide metrics.
 - **Students** — list, filters, and a student profile (move a student between sections to show it's interactive).
@@ -65,7 +61,7 @@ Click **Logout** → on the landing page click the **Organization Admin** role c
 
 ## 4. Super Admin experience — 20s
 
-Logout → **Super Admin** role card.
+Logout → **Sign in** with a super admin account.
 
 - **Dashboard** — platform-wide totals.
 - **Organizations / Requests** — approve/suspend orgs.
@@ -86,6 +82,5 @@ Logout → **Super Admin** role card.
 
 - **Something looks off?** Logout and re-enter — state resets cleanly.
 - **Short on time?** Do sections 1, 2, and 5 only (student story is the strongest).
-- **Deep-linking:** you can open a role directly via `/student`, `/admin`, or `/super-admin` (demo shortcut — it
-  bypasses login on purpose).
+- **Deep-linking:** `/student`, `/admin`, and `/super-admin` still route to the role workspace after a valid session.
 - Keep the narration on *outcomes* ("knows exactly what to study next"), not on the fact that data is mocked.

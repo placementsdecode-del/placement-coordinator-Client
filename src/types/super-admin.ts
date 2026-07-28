@@ -5,6 +5,7 @@ export type SuperAdminNavLabel =
   | "Organizations"
   | "Requests"
   | "Users"
+  | "Features"
   | "Plans"
   | "Analytics"
   | "Support"

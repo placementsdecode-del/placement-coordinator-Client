@@ -8,29 +8,79 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { auditLogs, organizationRequests, organizations, platformMetrics, platformUsers, supportTickets } from "@/data/super-admin";
 import { cn } from "@/lib/utils";
+import { createFeature as createFeatureRecord, listFeatures, updateFeature } from "@/services/features.service";
+import {
+  approveOrganizationRegistration,
+  listOrganizationRegistrations,
+  rejectOrganizationRegistration,
+} from "@/services/organization-registrations.service";
+import { listOrganizations } from "@/services/organizations.service";
+import { createUser as createUserRecord, listUsers } from "@/services/users.service";
+import type { AcceptedOrganization, ApiUser, Feature, RegisterOrg } from "@/types/api";
 import type { CommitEntry, OrganizationRequest, OrganizationRow, SuperAdminNavLabel } from "@/types/super-admin";
 
 export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdminNavLabel; onAction: (message: string) => void }) {
   const [orgRows, setOrgRows] = useState<OrganizationRow[]>(organizations);
   const [requests, setRequests] = useState<OrganizationRequest[]>(organizationRequests);
+  const [apiUsers, setApiUsers] = useState<ApiUser[]>([]);
+  const [features, setFeatures] = useState<Feature[]>([]);
+  const [loadError, setLoadError] = useState("");
   const [selectedOrgId, setSelectedOrgId] = useState(orgRows[0]?.id ?? "");
   const selectedOrg = orgRows.find((org) => org.id === selectedOrgId) ?? orgRows[0];
+
+  async function refreshPlatformData() {
+    setLoadError("");
+    try {
+      const [registrations, acceptedOrganizations, users, featureRows] = await Promise.all([
+        listOrganizationRegistrations("pending"),
+        listOrganizations(),
+        listUsers(),
+        listFeatures(),
+      ]);
+      const mappedOrganizations = acceptedOrganizations.map(mapOrganization);
+      setRequests(registrations.map(mapRegistration));
+      setOrgRows(mappedOrganizations.length ? mappedOrganizations : organizations);
+      setApiUsers(users);
+      setFeatures(featureRows);
+      setSelectedOrgId((current) => mappedOrganizations.find((org) => org.id === current)?.id ?? mappedOrganizations[0]?.id ?? current);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Unable to load platform data.");
+    }
+  }
+
+  useEffect(() => {
+    refreshPlatformData();
+  }, []);
 
   function updateOrgStatus(orgId: string, status: string) {
     setOrgRows((items) => items.map((org) => (org.id === orgId ? { ...org, status } : org)));
     onAction(`Organization ${status.toLowerCase()}.`);
   }
 
-  function handleRequest(requestId: string, status: string) {
-    setRequests((items) => items.map((request) => (request.id === requestId ? { ...request, status } : request)));
-    onAction(`Organization request ${status.toLowerCase()}.`);
+  async function handleRequest(requestId: string, status: string) {
+    try {
+      if (status === "Approved") {
+        await approveOrganizationRegistration(requestId, {
+          features: [],
+          adminName: "Organization Admin",
+          discussionNotes: "Approved from frontend console.",
+        });
+      } else {
+        await rejectOrganizationRegistration(requestId, { discussionNotes: "Rejected from frontend console." });
+      }
+      await refreshPlatformData();
+      onAction(`Organization request ${status.toLowerCase()}.`);
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "Request update failed.");
+    }
   }
 
   if (activeNav === "Organizations") {
-    return <OrganizationsPage organizations={orgRows} selectedOrg={selectedOrg} onSelectOrg={setSelectedOrgId} onUpdateStatus={updateOrgStatus} />;
+    return <OrganizationsPage organizations={orgRows} selectedOrg={selectedOrg} loadError={loadError} onSelectOrg={setSelectedOrgId} onUpdateStatus={updateOrgStatus} />;
   }
-  if (activeNav === "Requests") return <RequestsPage requests={requests} onHandleRequest={handleRequest} />;
-  if (activeNav === "Users") return <UsersPage />;
+  if (activeNav === "Requests") return <RequestsPage requests={requests} loadError={loadError} onHandleRequest={handleRequest} />;
+  if (activeNav === "Users") return <UsersPage apiUsers={apiUsers} onUserCreated={refreshPlatformData} onAction={onAction} />;
+  if (activeNav === "Features") return <FeaturesPage features={features} onFeatureChanged={refreshPlatformData} onAction={onAction} />;
   if (activeNav === "Plans") return <PlansPage onAction={onAction} />;
   if (activeNav === "Analytics") return <AnalyticsPage organizations={orgRows} />;
   if (activeNav === "Support") return <SupportPage onAction={onAction} />;
@@ -39,6 +89,34 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
   if (activeNav === "Settings") return <PlatformSettingsPage onAction={onAction} />;
 
   return <SuperAdminDashboard organizations={orgRows} requests={requests} onAction={onAction} />;
+}
+
+function mapRegistration(registration: RegisterOrg): OrganizationRequest {
+  return {
+    id: registration._id,
+    name: registration.orgName,
+    contact: registration.orgEmail,
+    requestedPlan: featureNames(registration.requestedFeatures),
+    status: registration.status === "pending" ? "New" : registration.status,
+    submitted: registration.externalId ?? "Submitted",
+  };
+}
+
+function mapOrganization(organization: AcceptedOrganization): OrganizationRow {
+  return {
+    id: organization._id,
+    name: organization.orgName,
+    plan: featureNames(organization.features) || "Custom",
+    status: organization.status === "active" ? "Active" : "Suspended",
+    students: 0,
+    coordinators: organization.adminUser ? 1 : 0,
+    usage: organization.status === "active" ? 72 : 28,
+    region: organization.address,
+  };
+}
+
+function featureNames(features: string[] | Feature[]) {
+  return features.map((feature) => (typeof feature === "string" ? feature : feature.name)).filter(Boolean).join(", ");
 }
 
 function SuperAdminDashboard({
@@ -129,11 +207,13 @@ function SuperAdminDashboard({
 function OrganizationsPage({
   organizations,
   selectedOrg,
+  loadError,
   onSelectOrg,
   onUpdateStatus,
 }: {
   organizations: OrganizationRow[];
   selectedOrg: OrganizationRow;
+  loadError: string;
   onSelectOrg: (orgId: string) => void;
   onUpdateStatus: (orgId: string, status: string) => void;
 }) {
@@ -144,6 +224,7 @@ function OrganizationsPage({
         title="Create, activate, suspend, and inspect tenant organizations."
         description="Each organization has isolated users, students, coordinators, sections, subscriptions, and usage."
       />
+      {loadError ? <ApiNotice message={loadError} /> : null}
       <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_410px]">
         <Card>
           <CardHeader>
@@ -193,7 +274,15 @@ function OrganizationsPage({
   );
 }
 
-function RequestsPage({ requests, onHandleRequest }: { requests: OrganizationRequest[]; onHandleRequest: (requestId: string, status: string) => void }) {
+function RequestsPage({
+  requests,
+  loadError,
+  onHandleRequest,
+}: {
+  requests: OrganizationRequest[];
+  loadError: string;
+  onHandleRequest: (requestId: string, status: string) => void;
+}) {
   return (
     <>
       <SectionIntro
@@ -201,6 +290,7 @@ function RequestsPage({ requests, onHandleRequest }: { requests: OrganizationReq
         title="Review and approve new institution onboarding requests."
         description="Approve valid institutions, reject incomplete requests, or mark them for review."
       />
+      {loadError ? <ApiNotice message={loadError} /> : null}
       <Card>
         <CardContent className="space-y-3 p-4 sm:p-5">
           {requests.map((request) => (
@@ -208,6 +298,7 @@ function RequestsPage({ requests, onHandleRequest }: { requests: OrganizationReq
               <div>
                 <p className="font-semibold">{request.name}</p>
                 <p className="text-sm text-muted-foreground">{request.contact} · {request.submitted}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Requested: {request.requestedPlan || "Standard setup"}</p>
               </div>
               <Badge variant="outline">{request.status}</Badge>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -228,7 +319,42 @@ function RequestsPage({ requests, onHandleRequest }: { requests: OrganizationReq
   );
 }
 
-function UsersPage() {
+function UsersPage({
+  apiUsers,
+  onUserCreated,
+  onAction,
+}: {
+  apiUsers: ApiUser[];
+  onUserCreated: () => Promise<void>;
+  onAction: (message: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [organization, setOrganization] = useState("");
+  const [roleName, setRoleName] = useState("teacher");
+  const [password, setPassword] = useState("");
+  const users = apiUsers.length ? apiUsers : platformUsers;
+
+  async function createUser(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      const response = await createUserRecord({
+        organization: organization.trim() || undefined,
+        name,
+        email,
+        roleName: roleName as "admin" | "teacher" | "student",
+        password: password.trim() || undefined,
+      });
+      await onUserCreated();
+      setName("");
+      setEmail("");
+      setPassword("");
+      onAction(response.temporaryPassword ? `User created. Temporary password: ${response.temporaryPassword}` : response.message || "User created.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "User creation failed.");
+    }
+  }
+
   return (
     <>
       <SectionIntro
@@ -237,20 +363,137 @@ function UsersPage() {
         description="Monitor organization admins, coordinators, and account status across tenants."
       />
       <Card>
+        <CardHeader>
+          <CardTitle>Create User</CardTitle>
+          <CardDescription>Superadmins must provide an organization id for tenant users.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="grid gap-3 md:grid-cols-5" onSubmit={createUser}>
+            <Input required placeholder="Name" value={name} onChange={(event) => setName(event.target.value)} />
+            <Input required type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} />
+            <Input placeholder="Organization id" value={organization} onChange={(event) => setOrganization(event.target.value)} />
+            <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={roleName} onChange={(event) => setRoleName(event.target.value)}>
+              <option value="admin">Admin</option>
+              <option value="teacher">Teacher</option>
+              <option value="student">Student</option>
+            </select>
+            <Input placeholder="Password optional" value={password} onChange={(event) => setPassword(event.target.value)} />
+            <Button className="md:col-span-5" type="submit">Create User</Button>
+          </form>
+        </CardContent>
+      </Card>
+      <Card>
         <CardContent className="space-y-3 p-4 sm:p-5">
-          {platformUsers.map((user) => (
+          {users.map((user) => (
             <div key={user.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_180px_110px] md:items-center">
               <div>
                 <p className="font-semibold">{user.name}</p>
-                <p className="text-sm text-muted-foreground">{user.email} · {user.organization}</p>
+                <p className="text-sm text-muted-foreground">{user.email} · {user.organization || "No organization"}</p>
               </div>
               <Badge variant="outline">{user.role}</Badge>
-              <Badge variant={user.status === "Active" ? "secondary" : "warning"}>{user.status}</Badge>
+              <Badge variant={user.status === "active" || user.status === "Active" ? "secondary" : "warning"}>{user.status}</Badge>
             </div>
           ))}
         </CardContent>
       </Card>
     </>
+  );
+}
+
+function FeaturesPage({
+  features,
+  onFeatureChanged,
+  onAction,
+}: {
+  features: Feature[];
+  onFeatureChanged: () => Promise<void>;
+  onAction: (message: string) => void;
+}) {
+  const [form, setForm] = useState({ key: "", name: "", description: "", enabledByDefault: false });
+
+  async function createFeature(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      await createFeatureRecord(form);
+      await onFeatureChanged();
+      setForm({ key: "", name: "", description: "", enabledByDefault: false });
+      onAction("Feature created.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "Feature creation failed.");
+    }
+  }
+
+  async function toggleFeature(feature: Feature, field: "enabledByDefault" | "isActive") {
+    try {
+      await updateFeature(feature._id, { ...feature, [field]: !feature[field] });
+      await onFeatureChanged();
+      onAction("Feature updated.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "Feature update failed.");
+    }
+  }
+
+  return (
+    <>
+      <SectionIntro
+        eyebrow="Features"
+        title="Manage platform modules available to organizations."
+        description="Create features and control default enablement for new organization requests."
+      />
+      <Card>
+        <CardHeader>
+          <CardTitle>Create Feature</CardTitle>
+          <CardDescription>Feature keys should be stable API identifiers.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="grid gap-3 md:grid-cols-[180px_220px_minmax(0,1fr)_160px]" onSubmit={createFeature}>
+            <Input required placeholder="key" value={form.key} onChange={(event) => setForm((current) => ({ ...current, key: event.target.value }))} />
+            <Input required placeholder="Name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
+            <Input required placeholder="Description" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
+            <label className="flex h-10 items-center gap-2 text-sm text-muted-foreground">
+              <input
+                className="h-4 w-4 accent-primary"
+                type="checkbox"
+                checked={form.enabledByDefault}
+                onChange={(event) => setForm((current) => ({ ...current, enabledByDefault: event.target.checked }))}
+              />
+              Default
+            </label>
+            <Button className="md:col-span-4" type="submit">Create Feature</Button>
+          </form>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="space-y-3 p-4 sm:p-5">
+          {features.length ? features.map((feature) => (
+            <div key={feature._id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_130px_120px_190px] md:items-center">
+              <div>
+                <p className="font-semibold">{feature.name}</p>
+                <p className="text-sm text-muted-foreground">{feature.key} · {feature.description}</p>
+              </div>
+              <Badge variant={feature.enabledByDefault ? "secondary" : "outline"}>{feature.enabledByDefault ? "Default" : "Optional"}</Badge>
+              <Badge variant={feature.isActive ? "secondary" : "warning"}>{feature.isActive ? "Active" : "Inactive"}</Badge>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button size="sm" variant="outline" onClick={() => toggleFeature(feature, "enabledByDefault")}>Default</Button>
+                <Button size="sm" variant="outline" onClick={() => toggleFeature(feature, "isActive")}>Active</Button>
+              </div>
+            </div>
+          )) : (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Connect the API to load feature rows.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+function ApiNotice({ message }: { message: string }) {
+  return (
+    <div className="rounded-md border border-accent/50 bg-accent/20 p-3 text-sm text-muted-foreground">
+      API data unavailable: {message}. Showing local demo data where available.
+    </div>
   );
 }
 

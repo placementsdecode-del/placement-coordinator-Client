@@ -5,23 +5,18 @@ placements** in one place. It combines structured, interview-oriented study guid
 practice, self-assessments, daily tasks, and progress tracking — alongside admin and super-admin views for the
 organizations that run placement programs.
 
-> Status: front-end prototype with mock data. Authentication and all data are currently simulated on the client
-> (no backend yet). See [Roadmap](#roadmap) for what a production version needs.
+> Status: front-end prototype connected to the API authentication flow. Some learning and dashboard views still use
+> local demo data until their backend endpoints are wired.
 
 ## Live demo
 
-Deployed on Vercel. Use one of the demo accounts below on the login screen (or click a **quick-login** button).
-
-| Role        | Email                  | Password |
-| ----------- | ---------------------- | -------- |
-| Student     | `student@gmail.com`    | `123456` |
-| Admin       | `admin@gmail.com`      | `123456` |
-| Super Admin | `superadmin@gmail.com` | `123456` |
+Deployed on Vercel. Sign in with an account created through the backend or use the organization registration flow to
+request a new institution account.
 
 ## Pitching / showcasing
 
-- **Landing page** — the app now opens on a marketing landing screen (hero, features, subject library, role cards)
-  with one-click entry into any role. Sign in returns the demo-account login.
+- **Landing page** — the app now opens on a marketing landing screen (hero, features, subject library, and sign-in
+  entry point). Sign in uses the API-backed login flow.
 - **Demo script** — a click-by-click walkthrough in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) so anyone can
   deliver the pitch consistently in ~2–4 minutes.
 - **Product one-pager** — [`docs/pitch-one-pager.html`](docs/pitch-one-pager.html), a self-contained visual overview
@@ -85,9 +80,8 @@ Product/UX requirements are documented in [`Placement Coordinator.md`](Placement
 
 The current build is a UI prototype. To make it production-ready:
 
-- **Backend + real authentication** (replace the mock login in
-  [`src/components/layout/login-screen.tsx`](src/components/layout/login-screen.tsx) and the path-based role
-  detection in [`src/App.tsx`](src/App.tsx)). Persist users, progress, submissions, and assessments.
+- **Persist all workflows** beyond authentication: learning progress, submissions, assessments, reports, and
+  announcements.
 - **Persist learning progress** (completed topics, bookmarks, revision queue) per user.
 - **Coordinator/admin data flows** wired to the backend (students, sections, groups, assessments, reports).
 - See `Placement Coordinator.md` §28 and §31 for the full feature backlog and MVP scope.

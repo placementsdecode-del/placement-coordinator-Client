@@ -4,25 +4,33 @@ import { BrandLogo } from "@/components/common/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { UserRole } from "@/types/auth";
 
-export function LoginScreen({ onLogin, onBack }: { onLogin: (role: UserRole) => void; onBack?: () => void }) {
+export function LoginScreen({
+  onLogin,
+  onBack,
+  onOpenRegistration,
+}: {
+  onLogin: (email: string, password: string) => Promise<void>;
+  onBack?: () => void;
+  onOpenRegistration: () => void;
+}) {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const account = demoCredentials[email.trim().toLowerCase()];
-
-    if (!account || account.password !== password) {
-      setError("Invalid email or password.");
-      return;
-    }
-
+    setIsSubmitting(true);
     setError("");
-    onLogin(account.role);
+    try {
+      await onLogin(email.trim(), password);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Invalid email or password.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -118,8 +126,11 @@ export function LoginScreen({ onLogin, onBack }: { onLogin: (role: UserRole) => 
                 </button>
               </div>
               {error ? <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p> : null}
-              <Button className="w-full" type="submit">
-                Login
+              <Button className="w-full" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Signing in..." : "Login"}
+              </Button>
+              <Button className="w-full" type="button" variant="outline" onClick={onOpenRegistration}>
+                Register Organization
               </Button>
             </form>
           </CardContent>
@@ -128,9 +139,3 @@ export function LoginScreen({ onLogin, onBack }: { onLogin: (role: UserRole) => 
     </main>
   );
 }
-
-const demoCredentials: Record<string, { password: string; role: UserRole }> = {
-  "student@gmail.com": { password: "123456", role: "student" },
-  "admin@gmail.com": { password: "123456", role: "admin" },
-  "superadmin@gmail.com": { password: "123456", role: "super-admin" },
-};

@@ -13,6 +13,12 @@ const MAX_PATCH_LINES = 200; // per file, to keep the bundle reasonable
 const MAX_FILE_CHANGES = 600; // skip diffs for files bigger than this (added + removed)
 // Generated / non-human-readable files: list them, but don't embed their diff.
 const SKIP_DIFF = [/package-lock\.json$/, /\.svg$/, /\.(png|jpe?g|gif|ico|woff2?)$/, /guides\/.*\.json$/];
+const REDACTIONS = [
+  [/student@gmail\.com/g, "[removed-demo-email]"],
+  [/admin@gmail\.com/g, "[removed-demo-email]"],
+  [/superadmin@gmail\.com/g, "[removed-demo-email]"],
+  [/123456/g, "[removed-demo-password]"],
+];
 
 // Map a commit message to a coarse product area so the changelog is scannable.
 function areaFor(message) {
@@ -30,6 +36,7 @@ function areaFor(message) {
 
 const esc = (value) => String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 const num = (value) => (value === "-" || value === undefined ? 0 : Number(value) || 0);
+const redact = (value) => REDACTIONS.reduce((current, [pattern, replacement]) => current.replace(pattern, replacement), String(value));
 
 // One record per commit: header line "@@<hash>|<author>|<date>|<subject>" then numstat lines.
 // If git is unavailable (or has no history) in this environment, keep the committed
@@ -85,13 +92,13 @@ function patchFor(hash, path, changes) {
   const start = lines.findIndex((line) => line.startsWith("@@"));
   const hunks = start >= 0 ? lines.slice(start) : lines;
   const truncated = hunks.length > MAX_PATCH_LINES;
-  return { patch: hunks.slice(0, MAX_PATCH_LINES).join("\n").trimEnd(), patchTruncated: truncated };
+  return { patch: redact(hunks.slice(0, MAX_PATCH_LINES).join("\n").trimEnd()), patchTruncated: truncated };
 }
 
 const rows = commits.map((c) => {
   let body = "";
   try {
-    body = execSync(`git show -s --format=%b ${c.hash}`, { encoding: "utf8" }).trim().replace(/\s+/g, " ");
+    body = redact(execSync(`git show -s --format=%b ${c.hash}`, { encoding: "utf8" }).trim().replace(/\s+/g, " "));
   } catch {
     body = "";
   }
@@ -105,10 +112,10 @@ const rows = commits.map((c) => {
 const fileLine = (f) =>
   `        { path: ${JSON.stringify(f.path)}, added: ${f.added}, removed: ${f.removed}, patch: ${JSON.stringify(f.patch)}, patchTruncated: ${f.patchTruncated} },`;
 const rowBlock = (r) => `  {
-    hash: "${esc(r.hash)}",
-    author: "${esc(r.author)}",
+    hash: "${esc(redact(r.hash))}",
+    author: "${esc(redact(r.author))}",
     date: "${esc(r.date)}",
-    message: "${esc(r.message)}",
+    message: "${esc(redact(r.message))}",
     area: "${esc(r.area)}",
     body: "${esc(r.body)}",
     filesChanged: ${r.filesChanged},

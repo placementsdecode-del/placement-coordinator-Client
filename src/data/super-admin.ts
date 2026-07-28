@@ -1,4 +1,4 @@
-import { BarChart3, Building2, ClipboardCheck, CreditCard, FileClock, GitCommitHorizontal, LayoutDashboard, LifeBuoy, Settings, Users } from "lucide-react";
+import { BarChart3, Building2, ClipboardCheck, CreditCard, FileClock, GitCommitHorizontal, LayoutDashboard, LifeBuoy, Settings, SlidersHorizontal, Users } from "lucide-react";
 import type { OrganizationRequest, OrganizationRow, PlatformUser, SuperAdminNavItem, SupportTicket } from "@/types/super-admin";
 
 export const superAdminNavItems: SuperAdminNavItem[] = [
@@ -6,6 +6,7 @@ export const superAdminNavItems: SuperAdminNavItem[] = [
   { label: "Organizations", icon: Building2 },
   { label: "Requests", icon: ClipboardCheck },
   { label: "Users", icon: Users },
+  { label: "Features", icon: SlidersHorizontal },
   { label: "Plans", icon: CreditCard },
   { label: "Analytics", icon: BarChart3 },
   { label: "Support", icon: LifeBuoy },
