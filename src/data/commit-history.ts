@@ -4,6 +4,31 @@ import type { CommitEntry } from "@/types/super-admin";
 // `files` is capped at the top 12 changed files per commit; `filesChanged` is the true total.
 export const commitHistory: CommitEntry[] = [
   {
+    hash: "a88bd48",
+    author: "naveed-devz",
+    date: "2026-07-28",
+    message: "removed default creds",
+    area: "Platform",
+    body: "",
+    filesChanged: 26,
+    insertions: 1077,
+    deletions: 148,
+    files: [
+        { path: "src/sections/super-admin/super-admin-section.tsx", added: 254, removed: 11, patch: "", patchTruncated: false },
+        { path: "src/data/commit-history.ts", added: 117, removed: 73, patch: "", patchTruncated: false },
+        { path: "src/sections/admin/admin-section.tsx", added: 87, removed: 5, patch: "", patchTruncated: false },
+        { path: "src/App.tsx", added: 64, removed: 8, patch: "", patchTruncated: false },
+        { path: "src/pages/public/organization-registration/containers/organization-registration-container.tsx", added: 71, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/pages/public/organization-registration/components/registration-form.tsx", added: 60, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/types/api.ts", added: 57, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/pages/public/organization-registration/components/feature-checklist.tsx", added: 49, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/services/api-client.ts", added: 48, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/components/layout/login-screen.tsx", added: 24, removed: 19, patch: "", patchTruncated: false },
+        { path: "src/services/organization-registrations.service.ts", added: 40, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/pages/public/organization-registration/organization-registration.constants.ts", added: 36, removed: 0, patch: "", patchTruncated: false },
+    ],
+  },
+  {
     hash: "021faf0",
     author: "JaganMohan-Y",
     date: "2026-07-28",
