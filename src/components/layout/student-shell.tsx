@@ -101,7 +101,7 @@ export function StudentShell({
             </Button>
             <div className="min-w-0">
               <h2 className="truncate text-lg font-semibold">{activeNav}</h2>
-              <p className="hidden text-sm text-muted-foreground sm:block">Riya Sharma, CSE Section C</p>
+              <p className="hidden text-sm text-muted-foreground sm:block">Student workspace</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

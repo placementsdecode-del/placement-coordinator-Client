@@ -9,20 +9,12 @@ import { selfAssessments } from "@/data/student";
 
 export function SelfAssessmentSection({ onLaunch }: { onLaunch: (title: string) => void }) {
   const [selectedOption, setSelectedOption] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState(selfAssessments[0].title);
+  const [selectedTemplate, setSelectedTemplate] = useState(selfAssessments[0]?.title ?? "");
   const [assessmentMode, setAssessmentMode] = useState("Written Test");
   const [inviteInput, setInviteInput] = useState("");
-  const [invites, setInvites] = useState(["Vikram Singh", "Meera Nair"]);
-  const [createdSessions, setCreatedSessions] = useState([
-    {
-      id: "session-1",
-      title: "DSA peer challenge",
-      mode: "Written Test",
-      participants: 4,
-      time: "Today, 6:00 PM",
-    },
-  ]);
-  const selectedAssessment = selfAssessments.find((item) => item.title === selectedTemplate) ?? selfAssessments[0];
+  const [invites, setInvites] = useState<string[]>([]);
+  const [createdSessions, setCreatedSessions] = useState<Array<{ id: string; title: string; mode: string; participants: number; time: string }>>([]);
+  const selectedAssessment = selfAssessments.find((item) => item.title === selectedTemplate) ?? null;
 
   function addInvite() {
     const name = inviteInput.trim();
@@ -54,7 +46,7 @@ export function SelfAssessmentSection({ onLaunch }: { onLaunch: (title: string) 
         title="Practice checks students can start anytime."
         description="Choose a skill area, take a timed self-check, and compare improvement against previous best scores."
         action={
-          <Button onClick={createPracticeSession}>
+          <Button disabled={!selectedAssessment} onClick={createPracticeSession}>
             <PlayCircle className="h-4 w-4" />
             Create Session
           </Button>
@@ -78,6 +70,7 @@ export function SelfAssessmentSection({ onLaunch }: { onLaunch: (title: string) 
                   {selfAssessments.map((item) => (
                     <option key={item.title}>{item.title}</option>
                   ))}
+                  {!selfAssessments.length ? <option value="">No templates available</option> : null}
                 </select>
               </div>
               <div className="space-y-2">
@@ -97,8 +90,8 @@ export function SelfAssessmentSection({ onLaunch }: { onLaunch: (title: string) 
 
             <div className="grid gap-3 sm:grid-cols-3">
               {[
-                { label: "Questions", value: String(selectedAssessment.questions), icon: MessageSquareText },
-                { label: "Duration", value: selectedAssessment.duration, icon: CalendarDays },
+                { label: "Questions", value: selectedAssessment ? String(selectedAssessment.questions) : "0", icon: MessageSquareText },
+                { label: "Duration", value: selectedAssessment?.duration ?? "Not set", icon: CalendarDays },
                 { label: "Participants", value: String(invites.length + 1), icon: Users },
               ].map((item) => (
                 <div key={item.label} className="rounded-lg border bg-background p-3">
@@ -127,7 +120,7 @@ export function SelfAssessmentSection({ onLaunch }: { onLaunch: (title: string) 
               </div>
             </div>
 
-            <Button className="w-full" onClick={createPracticeSession}>
+            <Button className="w-full" disabled={!selectedAssessment} onClick={createPracticeSession}>
               Create and Invite
             </Button>
           </CardContent>

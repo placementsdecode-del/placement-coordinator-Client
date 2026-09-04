@@ -110,7 +110,7 @@ export function HomeworkSection({
                 </div>
                 <div className="rounded-lg border bg-background p-3">
                   <p className="text-xs text-muted-foreground">Assigned by</p>
-                  <p className="font-semibold">Priya Raman</p>
+                  <p className="font-semibold">Coordinator</p>
                 </div>
               </div>
             ) : null}

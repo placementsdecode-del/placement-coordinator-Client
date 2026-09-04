@@ -1,4 +1,4 @@
-import { Award, BookOpen, BriefcaseBusiness, Code2, FileUp, Link, Mail, Phone, Users } from "lucide-react";
+import { FileUp } from "lucide-react";
 import { ChangePasswordCard } from "@/components/common/change-password-card";
 import { SectionIntro } from "@/components/common/section-intro";
 import { Badge } from "@/components/ui/badge";
@@ -6,15 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function ProfileSection({ mustChangePassword = false }: { mustChangePassword?: boolean }) {
-  const profileRows = [
-    { label: "Email", value: "riya.sharma@example.edu", icon: Mail },
-    { label: "Phone", value: "+91 98765 43210", icon: Phone },
-    { label: "Department", value: "Computer Science Engineering", icon: BookOpen },
-    { label: "Batch", value: "2027 · Section C", icon: Users },
-    { label: "Primary group", value: "Advanced Coding Group", icon: Code2 },
-    { label: "Placement interest", value: "Software Development", icon: BriefcaseBusiness },
-  ];
-
   return (
     <>
       <SectionIntro
@@ -33,23 +24,13 @@ export function ProfileSection({ mustChangePassword = false }: { mustChangePassw
           <CardContent className="p-5">
             <div className="flex flex-col items-center text-center">
               <div className="flex h-24 w-24 items-center justify-center rounded-lg bg-primary text-3xl font-bold text-primary-foreground">
-                RS
+                --
               </div>
-              <h2 className="mt-4 text-xl font-bold">Riya Sharma</h2>
-              <p className="text-sm text-muted-foreground">CSE · Section C · Roll 21CSE084</p>
+              <h2 className="mt-4 text-xl font-bold">Student Profile</h2>
+              <p className="text-sm text-muted-foreground">Profile details will appear after API data is connected.</p>
               <Badge className="mt-3" variant="secondary">
-                Placement Ready: 78%
+                No readiness score yet
               </Badge>
-            </div>
-            <div className="mt-6 space-y-3">
-              <Button className="w-full" variant="outline">
-                <Link className="h-4 w-4" />
-                Portfolio Link
-              </Button>
-              <Button className="w-full" variant="outline">
-                <Award className="h-4 w-4" />
-                Certificates
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -60,15 +41,9 @@ export function ProfileSection({ mustChangePassword = false }: { mustChangePassw
               <CardDescription>profile data.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2">
-              {profileRows.map((row) => (
-                <div key={row.label} className="flex gap-3 rounded-lg border p-3">
-                  <row.icon className="mt-1 h-4 w-4 shrink-0 text-primary" />
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">{row.label}</p>
-                    <p className="text-sm font-medium">{row.value}</p>
-                  </div>
-                </div>
-              ))}
+              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground md:col-span-2">
+                No profile details available yet.
+              </div>
             </CardContent>
           </Card>
           <Card>
@@ -77,11 +52,9 @@ export function ProfileSection({ mustChangePassword = false }: { mustChangePassw
               <CardDescription>Profile tags visible to coordinators.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
-              {["React", "TypeScript", "Java", "SQL", "Data Structures", "Public Speaking"].map((skill) => (
-                <Badge key={skill} variant="outline">
-                  {skill}
-                </Badge>
-              ))}
+              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                No skills available yet.
+              </div>
             </CardContent>
           </Card>
           <ChangePasswordCard mustChangePassword={mustChangePassword} />

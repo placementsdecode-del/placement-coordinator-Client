@@ -4,6 +4,27 @@ import type { CommitEntry } from "@/types/super-admin";
 // `files` is capped at the top 12 changed files per commit; `filesChanged` is the true total.
 export const commitHistory: CommitEntry[] = [
   {
+    hash: "db18977",
+    author: "naveed-devz",
+    date: "2026-09-04",
+    message: "Add in-app password change",
+    area: "Platform",
+    body: "",
+    filesChanged: 8,
+    insertions: 105,
+    deletions: 3,
+    files: [
+        { path: "src/components/common/change-password-card.tsx", added: 65, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/data/commit-history.ts", added: 21, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/services/auth.service.ts", added: 7, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/sections/admin/admin-section.tsx", added: 4, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/sections/profile/profile-section.tsx", added: 3, removed: 1, patch: "", patchTruncated: false },
+        { path: "src/constants/api.ts", added: 2, removed: 1, patch: "", patchTruncated: false },
+        { path: "src/App.tsx", added: 1, removed: 1, patch: "", patchTruncated: false },
+        { path: "src/sections/super-admin/super-admin-section.tsx", added: 2, removed: 0, patch: "", patchTruncated: false },
+    ],
+  },
+  {
     hash: "950f749",
     author: "naveed-devz",
     date: "2026-09-04",

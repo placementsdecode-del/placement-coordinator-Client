@@ -1,8 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { initialTasks, stats } from "@/data/student";
+import { stats } from "@/data/student";
 import type { TaskItem } from "@/types/student";
 
-export function MetricCards({ taskItems = initialTasks }: { taskItems?: TaskItem[] }) {
+export function MetricCards({ taskItems = [] }: { taskItems?: TaskItem[] }) {
   const dynamicStats = stats.map((stat) => {
     if (stat.label === "Tasks Due Today") {
       return { ...stat, value: String(taskItems.filter((task) => task.status !== "Completed").length) };
@@ -15,7 +15,7 @@ export function MetricCards({ taskItems = initialTasks }: { taskItems?: TaskItem
 
   return (
     <section className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
-      {dynamicStats.map((stat) => (
+      {dynamicStats.length ? dynamicStats.map((stat) => (
         <Card key={stat.label}>
           <CardContent className="flex items-center gap-3 p-4 sm:gap-4 sm:p-5">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted sm:h-11 sm:w-11">
@@ -28,7 +28,13 @@ export function MetricCards({ taskItems = initialTasks }: { taskItems?: TaskItem
             </div>
           </CardContent>
         </Card>
-      ))}
+      )) : (
+        <Card>
+          <CardContent className="p-4 text-sm text-muted-foreground sm:p-5">
+            No preparation metrics available yet.
+          </CardContent>
+        </Card>
+      )}
     </section>
   );
 }

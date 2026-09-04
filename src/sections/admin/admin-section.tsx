@@ -65,8 +65,8 @@ export function AdminSection({
   const [selectedSectionId, setSelectedSectionId] = useState(sections[2]?.id ?? sections[0]?.id);
   const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id ?? "");
 
-  const selectedSection = sections.find((section) => section.id === selectedSectionId) ?? sections[0];
-  const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? students[0];
+  const selectedSection = sections.find((section) => section.id === selectedSectionId) ?? sections[0] ?? null;
+  const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? students[0] ?? null;
 
   const refreshOrganizationUsers = useCallback(async () => {
     const organizationId = getOrganizationId(currentUser?.organization);
@@ -514,7 +514,7 @@ function StudentDetail({
   sections,
   onMoveStudent,
 }: {
-  student: AdminStudentRow;
+  student: AdminStudentRow | null;
   sections: SectionRow[];
   onMoveStudent: (studentId: string, sectionName: string) => Promise<void>;
 }) {
@@ -526,21 +526,27 @@ function StudentDetail({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-lg border bg-background p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-lg font-bold">{student.name}</p>
-              <p className="text-sm text-muted-foreground">{student.rollNo} · {student.section}</p>
-            </div>
-            <Badge variant={student.status === "Active" ? "secondary" : "danger"}>{student.status}</Badge>
-          </div>
-          <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
-            <p>Email: {student.email}</p>
-            <p>Phone: {student.phone}</p>
-            <p>Groups: {student.groups}</p>
-            <p>Pending work: {student.pending}</p>
-          </div>
+          {student ? (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-lg font-bold">{student.name}</p>
+                  <p className="text-sm text-muted-foreground">{student.rollNo} · {student.section}</p>
+                </div>
+                <Badge variant={student.status === "Active" ? "secondary" : "danger"}>{student.status}</Badge>
+              </div>
+              <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+                <p>Email: {student.email}</p>
+                <p>Phone: {student.phone}</p>
+                <p>Groups: {student.groups}</p>
+                <p>Pending work: {student.pending}</p>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">No student selected.</p>
+          )}
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        {student ? <div className="grid grid-cols-2 gap-3">
           {[
             ["Aptitude", student.aptitude],
             ["Coding", student.coding],
@@ -556,8 +562,8 @@ function StudentDetail({
               </div>
             </div>
           ))}
-        </div>
-        <div className="space-y-2">
+        </div> : null}
+        {student ? <div className="space-y-2">
           <label className="text-sm font-medium">Move to section</label>
           <select
             className="h-10 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
@@ -568,7 +574,7 @@ function StudentDetail({
               <option key={section.id}>{section.name}</option>
             ))}
           </select>
-        </div>
+        </div> : null}
       </CardContent>
     </Card>
   );
@@ -584,7 +590,7 @@ function StudentsAdmin({
 }: {
   sections: SectionRow[];
   students: AdminStudentRow[];
-  selectedStudent: AdminStudentRow;
+  selectedStudent: AdminStudentRow | null;
   onSelectStudent: (studentId: string) => void;
   onCreateStudent: (user: {
     name: string;
@@ -634,11 +640,11 @@ function StudentsAdmin({
             </select>
           </CardHeader>
           <CardContent className="space-y-3">
-            {filteredStudents.map((student) => (
+            {filteredStudents.length ? filteredStudents.map((student) => (
               <button
                 key={student.id}
                 className={`grid w-full gap-3 rounded-lg border p-3 text-left md:grid-cols-[minmax(0,1fr)_180px_120px] md:items-center ${
-                  selectedStudent.id === student.id ? "border-primary bg-primary/5" : "bg-white"
+                  selectedStudent?.id === student.id ? "border-primary bg-primary/5" : "bg-white"
                 }`}
                 onClick={() => onSelectStudent(student.id)}
               >
@@ -649,7 +655,11 @@ function StudentsAdmin({
                 <DonutProgress value={student.readiness} label="Readiness" size="sm" />
                 <Badge variant={student.pending > 4 ? "danger" : "outline"}>{student.pending} pending</Badge>
               </button>
-            ))}
+            )) : (
+              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                No students available yet.
+              </div>
+            )}
           </CardContent>
         </Card>
         <StudentDetail student={selectedStudent} sections={sections} onMoveStudent={onMoveStudent} />
@@ -679,8 +689,8 @@ function CreateStudentForm({
     email: "",
     phoneNumber: "",
     registrationNumber: "",
-    department: sections[0]?.department ?? "Computer Science",
-    batch: sections[0]?.batch ?? "2027",
+    department: sections[0]?.department ?? "",
+    batch: sections[0]?.batch ?? "",
     section: sections[0]?.id ?? "",
     password: "",
   });
@@ -705,7 +715,7 @@ function CreateStudentForm({
           }}
         >
           <Input required placeholder="Student name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
-          <Input required type="email" placeholder="student@gmail.com" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
+          <Input required type="email" placeholder="Student email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
           <Input placeholder="Phone number" value={form.phoneNumber} onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))} />
           <Input required placeholder="Registration number" value={form.registrationNumber} onChange={(event) => setForm((current) => ({ ...current, registrationNumber: event.target.value }))} />
           <Input required placeholder="Department" value={form.department} onChange={(event) => setForm((current) => ({ ...current, department: event.target.value }))} />
@@ -734,15 +744,15 @@ function SectionsAdmin({
 }: {
   sections: SectionRow[];
   students: AdminStudentRow[];
-  selectedSection: SectionRow;
-  selectedStudent: AdminStudentRow;
+  selectedSection: SectionRow | null;
+  selectedStudent: AdminStudentRow | null;
   onCreateSection: (section: SectionRow) => Promise<void>;
   onSelectSection: (sectionId: string) => void;
   onSelectStudent: (studentId: string) => void;
   onMoveStudent: (studentId: string, sectionName: string) => Promise<void>;
 }) {
   const [showForm, setShowForm] = useState(false);
-  const sectionStudents = students.filter((student) => student.section === selectedSection.name);
+  const sectionStudents = selectedSection ? students.filter((student) => student.section === selectedSection.name) : [];
 
   return (
     <>
@@ -765,10 +775,10 @@ function SectionsAdmin({
             <CardDescription>Purpose and student count.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {sections.map((section) => (
+            {sections.length ? sections.map((section) => (
               <button
                 key={section.id}
-                className={`w-full rounded-lg border p-3 text-left ${selectedSection.id === section.id ? "border-primary bg-primary/5" : "bg-white"}`}
+                className={`w-full rounded-lg border p-3 text-left ${selectedSection?.id === section.id ? "border-primary bg-primary/5" : "bg-white"}`}
                 onClick={() => onSelectSection(section.id)}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -782,25 +792,29 @@ function SectionsAdmin({
                   <Badge variant="outline">{section.coordinator}</Badge>
                 </div>
               </button>
-            ))}
+            )) : (
+              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                No sections available yet.
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>{selectedSection.name}</CardTitle>
-            <CardDescription>{selectedSection.description}</CardDescription>
+            <CardTitle>{selectedSection?.name ?? "No section selected"}</CardTitle>
+            <CardDescription>{selectedSection?.description ?? "Create a section to manage students."}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-3">
+            {selectedSection ? <div className="grid gap-3 sm:grid-cols-3">
               <InfoTile label="Department" value={selectedSection.department} />
               <InfoTile label="Batch" value={selectedSection.batch} />
               <InfoTile label="Students" value={String(sectionStudents.length)} />
-            </div>
+            </div> : null}
             {sectionStudents.length > 0 ? sectionStudents.map((student) => (
               <button
                 key={student.id}
                 className={`grid w-full gap-3 rounded-lg border p-3 text-left md:grid-cols-[minmax(0,1fr)_120px_auto] md:items-center ${
-                  selectedStudent.id === student.id ? "border-primary bg-primary/5" : "bg-white"
+                  selectedStudent?.id === student.id ? "border-primary bg-primary/5" : "bg-white"
                 }`}
                 onClick={() => onSelectStudent(student.id)}
               >
@@ -832,8 +846,8 @@ function SectionsAdmin({
 function CreateSectionForm({ onCreateSection }: { onCreateSection: (section: SectionRow) => Promise<void> }) {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
-  const [department, setDepartment] = useState("Computer Science");
-  const [batch, setBatch] = useState("2027");
+  const [department, setDepartment] = useState("");
+  const [batch, setBatch] = useState("");
 
   return (
     <Card>
@@ -846,19 +860,20 @@ function CreateSectionForm({ onCreateSection }: { onCreateSection: (section: Sec
           className="grid gap-3 md:grid-cols-4"
           onSubmit={(event) => {
             event.preventDefault();
-            const sectionName = name.trim() || "New Section";
+            const sectionName = name.trim();
+            if (!sectionName || !code.trim() || !department.trim() || !batch.trim()) return;
             onCreateSection({
               id: crypto.randomUUID(),
               name: sectionName,
-              code: code.trim() || sectionName.toUpperCase().replace(/\s+/g, "-"),
+              code: code.trim(),
               department,
               batch,
-              academicYear: "2026-2027",
+              academicYear: "",
               students: 0,
               coordinator: "Unassigned",
               readiness: 0,
               status: "Active",
-              description: "Newly created organization section.",
+              description: "",
             });
             setName("");
             setCode("");
@@ -913,7 +928,7 @@ function CoordinatorsAdmin({
   const [role, setRole] = useState(roles[0]?.name ?? "");
   const [section, setSection] = useState(sections[0]?.name ?? "");
   const [roleName, setRoleName] = useState("");
-  const [permissions, setPermissions] = useState("Manage students, Create tasks");
+  const [permissions, setPermissions] = useState("");
 
   return (
     <>
@@ -934,19 +949,20 @@ function CoordinatorsAdmin({
               className="grid gap-3 md:grid-cols-2"
               onSubmit={async (event) => {
                 event.preventDefault();
+                if (!name.trim() || !email.trim()) return;
                 const coordinator = {
                   id: crypto.randomUUID(),
-                  name: name || "New Coordinator",
-                  email: email || "coordinator@example.edu",
-                  phone: phoneNumber || "+91 90000 00000",
+                  name,
+                  email,
+                  phone: phoneNumber,
                   role,
                   sections: [section],
                   status: "Active",
                 };
                 const createdUser = await onCreateOrganizationUser({
-                  name: name || "New Coordinator",
-                  email: email || "coordinator@example.edu",
-                  phoneNumber: phoneNumber || "+91 90000 00000",
+                  name,
+                  email,
+                  phoneNumber,
                   roleName: "teacher",
                   password: password.trim() || undefined,
                 });
@@ -957,8 +973,8 @@ function CoordinatorsAdmin({
                 setPassword("");
               }}
             >
-              <Input placeholder="Coordinator name" value={name} onChange={(event) => setName(event.target.value)} />
-              <Input placeholder="Email address" value={email} onChange={(event) => setEmail(event.target.value)} />
+              <Input required placeholder="Coordinator name" value={name} onChange={(event) => setName(event.target.value)} />
+              <Input required placeholder="Email address" value={email} onChange={(event) => setEmail(event.target.value)} />
               <Input placeholder="Phone number" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} />
               <Input placeholder="Password optional" value={password} onChange={(event) => setPassword(event.target.value)} />
               <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={role} onChange={(event) => setRole(event.target.value)}>
@@ -987,7 +1003,7 @@ function CoordinatorsAdmin({
               onClick={() => {
                 onAddRole({
                   id: crypto.randomUUID(),
-                  name: roleName || "Custom Coordinator Role",
+                  name: roleName,
                   permissions: permissions.split(",").map((item) => item.trim()).filter(Boolean),
                 });
                 setRoleName("");
@@ -1568,30 +1584,24 @@ function GroupsAdmin({ onAction }: { onAction: (message: string) => void }) {
         action={<Button onClick={() => onAction("Group created.")}><Plus className="h-4 w-4" />New Group</Button>}
       />
       <section className="grid gap-4 md:grid-cols-3">
-        {["Advanced Coding Group", "Aptitude Improvement Group", "Interview Preparation Group"].map((group) => (
-          <Card key={group}>
-            <CardHeader>
-              <CardTitle>{group}</CardTitle>
-              <CardDescription>Cross-section student group</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="outline">Active</Badge>
-            </CardContent>
-          </Card>
-        ))}
+        <Card className="md:col-span-3">
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            No groups available yet.
+          </CardContent>
+        </Card>
       </section>
     </>
   );
 }
 
 function SettingsAdmin({ onAction }: { onAction: (message: string) => void }) {
-  const [orgName, setOrgName] = useState("ABC Institute of Technology");
-  const [shortName, setShortName] = useState("ABC Institute");
-  const [academicYear, setAcademicYear] = useState("2026-2027");
-  const [contactEmail, setContactEmail] = useState("admin@abc.edu");
-  const [defaultDepartment, setDefaultDepartment] = useState("Placement Department");
-  const [studentPortalTitle, setStudentPortalTitle] = useState("ABC Placement Readiness Portal");
-  const [supportContact, setSupportContact] = useState("placements@abc.edu");
+  const [orgName, setOrgName] = useState("");
+  const [shortName, setShortName] = useState("");
+  const [academicYear, setAcademicYear] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [defaultDepartment, setDefaultDepartment] = useState("");
+  const [studentPortalTitle, setStudentPortalTitle] = useState("");
+  const [supportContact, setSupportContact] = useState("");
   const [brandColor, setBrandColor] = useState("#153E9F");
 
   return (

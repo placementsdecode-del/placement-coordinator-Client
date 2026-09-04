@@ -31,7 +31,7 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
   const [permissions, setPermissions] = useState<string[]>([]);
   const [loadError, setLoadError] = useState("");
   const [selectedOrgId, setSelectedOrgId] = useState(orgRows[0]?.id ?? "");
-  const selectedOrg = orgRows.find((org) => org.id === selectedOrgId) ?? orgRows[0];
+  const selectedOrg = orgRows.find((org) => org.id === selectedOrgId) ?? orgRows[0] ?? null;
 
   async function refreshPlatformData() {
     setLoadError("");
@@ -47,7 +47,7 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
       const mappedOrganizations = acceptedOrganizations.map(mapOrganization);
       setRequests(registrations.map(mapRegistration));
       setApiOrganizations(acceptedOrganizations);
-      setOrgRows(mappedOrganizations.length ? mappedOrganizations : organizations);
+      setOrgRows(mappedOrganizations);
       setApiUsers(users);
       setFeatures(featureRows);
       setRoles(roleRows);
@@ -267,39 +267,40 @@ function OrganizationsPage({
 }: {
   organizations: OrganizationRow[];
   apiOrganizations: AcceptedOrganization[];
-  selectedOrg: OrganizationRow;
+  selectedOrg: OrganizationRow | null;
   loadError: string;
   onSelectOrg: (orgId: string) => void;
   onUpdateDetails: (orgId: string, payload: Partial<AcceptedOrganization>) => Promise<void>;
   onUpdateStatus: (orgId: string, status: string) => Promise<void>;
 }) {
-  const selectedApiOrg = apiOrganizations.find((organization) => organization._id === selectedOrg.id);
+  const selectedApiOrg = selectedOrg ? apiOrganizations.find((organization) => organization._id === selectedOrg.id) : undefined;
   const [form, setForm] = useState({
-    orgName: selectedApiOrg?.orgName ?? selectedOrg.name,
+    orgName: selectedApiOrg?.orgName ?? selectedOrg?.name ?? "",
     orgEmail: selectedApiOrg?.orgEmail ?? "",
     phoneNumber: selectedApiOrg?.phoneNumber ?? "",
     country: selectedApiOrg?.location?.country ?? "",
     state: selectedApiOrg?.location?.state ?? "",
     city: selectedApiOrg?.location?.city ?? "",
     postalCode: selectedApiOrg?.location?.postalCode ?? "",
-    address: selectedApiOrg?.address ?? selectedOrg.region,
+    address: selectedApiOrg?.address ?? selectedOrg?.region ?? "",
   });
 
   useEffect(() => {
     setForm({
-      orgName: selectedApiOrg?.orgName ?? selectedOrg.name,
+      orgName: selectedApiOrg?.orgName ?? selectedOrg?.name ?? "",
       orgEmail: selectedApiOrg?.orgEmail ?? "",
       phoneNumber: selectedApiOrg?.phoneNumber ?? "",
       country: selectedApiOrg?.location?.country ?? "",
       state: selectedApiOrg?.location?.state ?? "",
       city: selectedApiOrg?.location?.city ?? "",
       postalCode: selectedApiOrg?.location?.postalCode ?? "",
-      address: selectedApiOrg?.address ?? selectedOrg.region,
+      address: selectedApiOrg?.address ?? selectedOrg?.region ?? "",
     });
-  }, [selectedApiOrg?._id, selectedOrg.id]);
+  }, [selectedApiOrg?._id, selectedOrg?.id]);
 
   async function submitDetails(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!selectedOrg) return;
     await onUpdateDetails(selectedOrg.id, {
       orgName: form.orgName,
       orgEmail: form.orgEmail,
@@ -333,7 +334,7 @@ function OrganizationsPage({
               <button
                 key={org.id}
                 className={`grid w-full gap-3 rounded-lg border p-3 text-left md:grid-cols-[minmax(0,1fr)_110px_120px] md:items-center ${
-                  selectedOrg.id === org.id ? "border-primary bg-primary/5" : "bg-white"
+                  selectedOrg?.id === org.id ? "border-primary bg-primary/5" : "bg-white"
                 }`}
                 onClick={() => onSelectOrg(org.id)}
               >
@@ -345,21 +346,34 @@ function OrganizationsPage({
                 <Badge variant={org.status === "Active" ? "secondary" : org.status === "Suspended" ? "danger" : "warning"}>{org.status}</Badge>
               </button>
             ))}
+            {!organizations.length ? (
+              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                No organizations available yet.
+              </div>
+            ) : null}
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>{selectedOrg.name}</CardTitle>
+            <CardTitle>{selectedOrg?.name ?? "No organization selected"}</CardTitle>
             <CardDescription>Tenant controls and usage.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <InfoTile label="Plan" value={selectedOrg.plan} />
-              <InfoTile label="Status" value={selectedOrg.status} />
-              <InfoTile label="Students" value={String(selectedOrg.students)} />
-              <InfoTile label="Coordinators" value={String(selectedOrg.coordinators)} />
-            </div>
-            <DonutProgress value={selectedOrg.usage} label="Usage" caption="Current tenant resource usage" />
+            {selectedOrg ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <InfoTile label="Plan" value={selectedOrg.plan} />
+                  <InfoTile label="Status" value={selectedOrg.status} />
+                  <InfoTile label="Students" value={String(selectedOrg.students)} />
+                  <InfoTile label="Coordinators" value={String(selectedOrg.coordinators)} />
+                </div>
+                <DonutProgress value={selectedOrg.usage} label="Usage" caption="Current tenant resource usage" />
+              </>
+            ) : (
+              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                Select an organization after one is approved.
+              </div>
+            )}
             <form className="grid gap-2" onSubmit={submitDetails}>
               <Input required placeholder="Organization name" value={form.orgName} onChange={(event) => setForm((current) => ({ ...current, orgName: event.target.value }))} />
               <Input required type="email" placeholder="Organization email" value={form.orgEmail} onChange={(event) => setForm((current) => ({ ...current, orgEmail: event.target.value }))} />
@@ -375,11 +389,11 @@ function OrganizationsPage({
                 value={form.address}
                 onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
               />
-              <Button type="submit" variant="outline">Update Details</Button>
+              <Button type="submit" variant="outline" disabled={!selectedOrg}>Update Details</Button>
             </form>
             <div className="grid gap-2 sm:grid-cols-2">
-              <Button variant="outline" onClick={() => onUpdateStatus(selectedOrg.id, "Active")}>Activate</Button>
-              <Button variant="outline" onClick={() => onUpdateStatus(selectedOrg.id, "Suspended")}>Suspend</Button>
+              <Button variant="outline" disabled={!selectedOrg} onClick={() => selectedOrg && onUpdateStatus(selectedOrg.id, "Active")}>Activate</Button>
+              <Button variant="outline" disabled={!selectedOrg} onClick={() => selectedOrg && onUpdateStatus(selectedOrg.id, "Suspended")}>Suspend</Button>
             </div>
           </CardContent>
         </Card>
@@ -648,7 +662,7 @@ function FeaturesPage({
 function ApiNotice({ message }: { message: string }) {
   return (
     <div className="rounded-md border border-accent/50 bg-accent/20 p-3 text-sm text-muted-foreground">
-      API data unavailable: {message}. Showing local demo data where available.
+      API data unavailable: {message}.
     </div>
   );
 }

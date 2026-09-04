@@ -8,24 +8,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { codingPractice } from "@/data/student";
 
 export function CodingPracticeSection({ onAction }: { onAction: (message: string) => void }) {
-  const [selectedProblem, setSelectedProblem] = useState(codingPractice[0]);
+  const [selectedProblem, setSelectedProblem] = useState(codingPractice[0] ?? null);
   const [language, setLanguage] = useState("TypeScript");
   const [testResult, setTestResult] = useState("No test run yet.");
-  const [codeDrafts, setCodeDrafts] = useState<Record<string, string>>({
-    [codingPractice[0].title]: `function solve(input: string) {
-  const values = input.trim().split(" ");
-  return values.length;
-}`,
-  });
+  const [codeDrafts, setCodeDrafts] = useState<Record<string, string>>({});
 
   const currentCode =
-    codeDrafts[selectedProblem.title] ??
+    selectedProblem ? codeDrafts[selectedProblem.title] ??
     `function solve(input: string) {
   // Write your ${language} solution here
   return "";
-}`;
+}` : "";
 
   function updateCode(value: string) {
+    if (!selectedProblem) return;
     setCodeDrafts((drafts) => ({ ...drafts, [selectedProblem.title]: value }));
   }
 
@@ -70,11 +66,11 @@ export function CodingPracticeSection({ onAction }: { onAction: (message: string
             </select>
           </CardHeader>
           <CardContent className="space-y-3">
-            {codingPractice.map((problem) => (
+            {codingPractice.length ? codingPractice.map((problem) => (
               <button
                 key={problem.title}
                 className={`grid w-full gap-3 rounded-lg border p-3 text-left transition-colors sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center ${
-                  selectedProblem.title === problem.title ? "border-primary bg-primary/5" : "bg-white"
+                  selectedProblem?.title === problem.title ? "border-primary bg-primary/5" : "bg-white"
                 }`}
                 onClick={() => setSelectedProblem(problem)}
               >
@@ -91,7 +87,11 @@ export function CodingPracticeSection({ onAction }: { onAction: (message: string
                 </div>
                 <DonutProgress value={problem.acceptance} size="sm" className="justify-self-start sm:justify-self-end" />
               </button>
-            ))}
+            )) : (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                No coding practice problems available yet.
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -99,12 +99,12 @@ export function CodingPracticeSection({ onAction }: { onAction: (message: string
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <CardTitle>{selectedProblem.title}</CardTitle>
+                <CardTitle>{selectedProblem?.title ?? "No problem selected"}</CardTitle>
                 <CardDescription>
-                  {selectedProblem.topic} · {selectedProblem.platform} · {language}
+                  {selectedProblem ? `${selectedProblem.topic} · ${selectedProblem.platform} · ${language}` : "Problems will appear here when assigned."}
                 </CardDescription>
               </div>
-              <Badge variant={selectedProblem.status === "Solved" ? "secondary" : "warning"}>{selectedProblem.status}</Badge>
+              {selectedProblem ? <Badge variant={selectedProblem.status === "Solved" ? "secondary" : "warning"}>{selectedProblem.status}</Badge> : null}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -129,6 +129,7 @@ export function CodingPracticeSection({ onAction }: { onAction: (message: string
                 className="min-h-72 w-full resize-y bg-slate-950 p-4 font-mono text-sm leading-6 text-slate-100 outline-none"
                 spellCheck={false}
                 value={currentCode}
+                disabled={!selectedProblem}
                 onChange={(event) => updateCode(event.target.value)}
               />
             </div>
@@ -139,15 +140,16 @@ export function CodingPracticeSection({ onAction }: { onAction: (message: string
             <div className="grid gap-3 sm:grid-cols-2">
               <Button
                 variant="outline"
+                disabled={!selectedProblem}
                 onClick={() => {
-                  setTestResult("3/4 sample tests passed. Check empty input edge case.");
-                  onAction("Sample tests executed.");
+                  setTestResult("Tests executed.");
+                  onAction("Tests executed.");
                 }}
               >
                 <Play className="h-4 w-4" />
                 Run Tests
               </Button>
-              <Button onClick={() => onAction(`${selectedProblem.title} submitted for review.`)}>
+              <Button disabled={!selectedProblem} onClick={() => selectedProblem && onAction(`${selectedProblem.title} submitted for review.`)}>
                 <Send className="h-4 w-4" />
                 Submit Code
               </Button>
@@ -156,25 +158,6 @@ export function CodingPracticeSection({ onAction }: { onAction: (message: string
         </Card>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        {[
-          { label: "Problems solved", value: "42", icon: Code2 },
-          { label: "Weekly streak", value: "5 days", icon: Play },
-          { label: "Avg acceptance", value: "78%", icon: Send },
-        ].map((item) => (
-          <Card key={item.label}>
-            <CardContent className="flex items-center gap-4 p-4 sm:p-5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-muted text-primary">
-                <item.icon className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{item.label}</p>
-                <p className="text-2xl font-bold">{item.value}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
     </>
   );
 }

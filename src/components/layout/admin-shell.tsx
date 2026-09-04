@@ -47,7 +47,7 @@ export function AdminShell({
           </Button>
         </div>
         <div className="border-b px-5 py-3">
-          <p className="text-sm font-bold">ABC Institute</p>
+          <p className="text-sm font-bold">Organization Workspace</p>
           <p className="text-xs text-muted-foreground">Organization Admin</p>
         </div>
         <nav className="h-[calc(100vh-7.25rem)] space-y-1 overflow-y-auto p-3">

@@ -5,8 +5,8 @@ placements** in one place. It combines structured, interview-oriented study guid
 practice, self-assessments, daily tasks, and progress tracking — alongside admin and super-admin views for the
 organizations that run placement programs.
 
-> Status: front-end prototype connected to the API authentication flow. Some learning and dashboard views still use
-> local demo data until their backend endpoints are wired.
+> Status: front-end prototype connected to the API authentication flow. Study materials are local content; operational
+> data is expected from backend APIs.
 
 ## Live demo
 
@@ -67,7 +67,7 @@ npm run dev        # start the dev server (http://localhost:5173)
 ```text
 src/
 ├── components/      # ui primitives, layout shells, shared common components
-├── data/            # mock data for student / admin / super-admin
+├── data/            # navigation metadata and static learning content
 ├── sections/        # feature modules (study-materials, career-roadmaps, coding-practice, ...)
 ├── types/           # shared TypeScript types
 ├── lib/             # utilities (cn, ...)

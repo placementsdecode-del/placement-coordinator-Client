@@ -34,16 +34,20 @@ export function AnalyticsAndLeaderboard() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
-            {metrics.map((metric) => (
+            {metrics.length ? metrics.map((metric) => (
               <div key={metric.label} className="rounded-lg border bg-background p-3">
                 <p className="text-sm text-muted-foreground">{metric.label}</p>
                 <p className="mt-1 text-2xl font-bold">{metric.value}</p>
                 <p className="text-xs text-muted-foreground">{metric.detail}</p>
               </div>
-            ))}
+            )) : (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground sm:col-span-2">
+                No analytics available yet.
+              </div>
+            )}
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            {sectionPerformance.map((item) => (
+            {sectionPerformance.length ? sectionPerformance.map((item) => (
               <div key={item.section} className="rounded-lg border p-3">
                 <p className="text-sm font-semibold">{item.section}</p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -51,7 +55,11 @@ export function AnalyticsAndLeaderboard() {
                   <DonutProgress value={item.completion} label="Completion" size="sm" />
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground md:col-span-2">
+                No section performance data available yet.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -62,12 +70,11 @@ export function AnalyticsAndLeaderboard() {
           <CardDescription>{scope === "section" ? "CSE Section C ranking." : "Organization ranking."}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {rankedRows.map((row) => (
+          {rankedRows.length ? rankedRows.map((row) => (
             <div
               key={`${scope}-${row.name}`}
               className={cn(
                 "grid grid-cols-[36px_minmax(0,1fr)_52px] items-center gap-3 rounded-lg border p-3",
-                row.name === "Riya Sharma" && "border-primary/40 bg-primary/5",
               )}
             >
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-sm font-bold">
@@ -79,7 +86,11 @@ export function AnalyticsAndLeaderboard() {
               </div>
               <p className="text-right text-lg font-bold">{row.score}</p>
             </div>
-          ))}
+          )) : (
+            <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+              No leaderboard rows available yet.
+            </div>
+          )}
         </CardContent>
       </Card>
     </section>
