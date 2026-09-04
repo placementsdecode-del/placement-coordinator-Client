@@ -25,8 +25,11 @@ import {
   adminTasks,
   coordinatorRoles,
 } from "@/data/admin";
+import { listPermissions, listRoles, syncOrganizationRoles, updateRole } from "@/services/roles.service";
+import { createAssessment as createAssessmentRecord, listAssessments, validateAssessment } from "@/services/assessments.service";
+import { assignStudentToSection, createSection as createSectionRecord, listSections, updateSection } from "@/services/sections.service";
 import { createUser, listUsers } from "@/services/users.service";
-import type { ApiUser } from "@/types/api";
+import type { ApiAssessment, ApiAssessmentQuestion, ApiRole, ApiSection, ApiUser } from "@/types/api";
 import type {
   AdminAssessment,
   AdminNavLabel,
@@ -51,9 +54,13 @@ export function AdminSection({
   const [students, setStudents] = useState<AdminStudentRow[]>(adminStudents);
   const [coordinators, setCoordinators] = useState<CoordinatorRow[]>(adminCoordinators);
   const [organizationUsers, setOrganizationUsers] = useState<ApiUser[]>([]);
+  const [apiRoles, setApiRoles] = useState<ApiRole[]>([]);
+  const [apiPermissions, setApiPermissions] = useState<string[]>([]);
   const [roles, setRoles] = useState<CoordinatorRole[]>(coordinatorRoles);
   const [tasks, setTasks] = useState<AdminTask[]>(adminTasks);
   const [assessments, setAssessments] = useState<AdminAssessment[]>(adminAssessments);
+  const [apiSections, setApiSections] = useState<ApiSection[]>([]);
+  const [apiAssessments, setApiAssessments] = useState<ApiAssessment[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState(sections[2]?.id ?? sections[0]?.id);
   const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id ?? "");
 
@@ -61,11 +68,22 @@ export function AdminSection({
   const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? students[0];
 
   const refreshOrganizationUsers = useCallback(async () => {
+    const organizationId = getOrganizationId(currentUser?.organization);
     try {
-      const users = await listUsers(currentUser?.organization);
+      const [users, roleRows, permissionRows] = await Promise.all([
+        listUsers(organizationId),
+        listRoles(organizationId),
+        listPermissions(),
+      ]);
       setOrganizationUsers(users);
+      const studentRows = users.filter((user) => user.role === "student").map(mapStudentUser);
+      if (studentRows.length) setStudents(studentRows);
+      setApiRoles(roleRows);
+      setApiPermissions(permissionRows);
     } catch {
       setOrganizationUsers([]);
+      setApiRoles([]);
+      setApiPermissions([]);
     }
   }, [currentUser?.organization]);
 
@@ -73,19 +91,81 @@ export function AdminSection({
     refreshOrganizationUsers();
   }, [refreshOrganizationUsers]);
 
-  function createSection(section: SectionRow) {
-    setSections((items) => [section, ...items]);
-    setSelectedSectionId(section.id);
-    onAction("Section created.");
+  const refreshOrganizationWork = useCallback(async () => {
+    const organizationId = getOrganizationId(currentUser?.organization);
+    if (!organizationId) return;
+
+    try {
+      const [sectionRows, assessmentRows] = await Promise.all([
+        listSections(organizationId),
+        listAssessments(organizationId),
+      ]);
+      setApiSections(sectionRows);
+      if (sectionRows.length) setSections(sectionRows.map(mapSection));
+      setApiAssessments(assessmentRows);
+      if (assessmentRows.length) setAssessments(assessmentRows.map(mapAssessment));
+    } catch {
+      setApiSections([]);
+      setApiAssessments([]);
+    }
+  }, [currentUser?.organization]);
+
+  useEffect(() => {
+    refreshOrganizationWork();
+  }, [refreshOrganizationWork]);
+
+  async function createSection(section: SectionRow) {
+    const organizationId = getOrganizationId(currentUser?.organization);
+    try {
+      const response = await createSectionRecord({
+        organization: organizationId,
+        name: section.name,
+        code: section.code,
+        department: section.department,
+        batch: section.batch,
+        academicYear: section.academicYear,
+        description: section.description,
+        status: "active",
+      });
+      await refreshOrganizationWork();
+      setSelectedSectionId(response.section._id);
+      onAction(response.message || "Section created.");
+    } catch (error) {
+      setSections((items) => [section, ...items]);
+      setSelectedSectionId(section.id);
+      onAction(error instanceof Error ? error.message : "Section created locally only.");
+    }
   }
 
-  function moveStudent(studentId: string, sectionName: string) {
-    setStudents((items) => items.map((student) => (student.id === studentId ? { ...student, section: sectionName } : student)));
-    onAction("Student moved to another section.");
+  async function moveStudent(studentId: string, sectionName: string) {
+    const apiSection = apiSections.find((section) => section.name === sectionName);
+    try {
+      if (apiSection) {
+        await assignStudentToSection(apiSection._id, studentId);
+        await refreshOrganizationUsers();
+      }
+      setStudents((items) => items.map((student) => (student.id === studentId ? { ...student, section: sectionName } : student)));
+      onAction("Student moved to another section.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "Student move failed.");
+    }
   }
 
-  function addCoordinator(coordinator: CoordinatorRow) {
+  async function addCoordinator(coordinator: CoordinatorRow, teacherId?: string) {
+    const apiSectionIds = apiSections.filter((section) => coordinator.sections.includes(section.name)).map((section) => section._id);
+    const teacher = teacherId ? { id: teacherId } : organizationUsers.find((user) => user.email === coordinator.email);
     setCoordinators((items) => [coordinator, ...items]);
+
+    if (teacher && apiSectionIds.length) {
+      await Promise.all(apiSectionIds.map((sectionId) => {
+        const section = apiSections.find((item) => item._id === sectionId);
+        const assignedTeachers = new Set(section?.assignedTeachers.map((item) => item.id) ?? []);
+        assignedTeachers.add(teacher.id);
+        return updateSection(sectionId, { assignedTeachers: Array.from(assignedTeachers) });
+      }));
+      await refreshOrganizationWork();
+    }
+
     onAction("Coordinator added.");
   }
 
@@ -97,17 +177,68 @@ export function AdminSection({
     password?: string;
   }) {
     try {
-      const response = await createUser(user);
+      const response = await createUser({ ...user, organization: getOrganizationId(currentUser?.organization) });
       await refreshOrganizationUsers();
       onAction(response.temporaryPassword ? `User created. Temporary password: ${response.temporaryPassword}` : response.message || "User created.");
+      return response.user;
     } catch (error) {
       onAction(error instanceof Error ? error.message : "User creation failed.");
+      return undefined;
+    }
+  }
+
+  async function createStudent(user: {
+    name: string;
+    email: string;
+    phoneNumber: string;
+    registrationNumber: string;
+    department: string;
+    batch: string;
+    section?: string;
+    password?: string;
+  }) {
+    try {
+      const response = await createUser({
+        ...user,
+        organization: getOrganizationId(currentUser?.organization),
+        roleName: "student",
+      });
+      await refreshOrganizationUsers();
+      onAction(response.temporaryPassword ? `Student created. Temporary password: ${response.temporaryPassword}` : response.message || "Student created.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "Student creation failed.");
     }
   }
 
   function addRole(role: CoordinatorRole) {
     setRoles((items) => [role, ...items]);
     onAction("Coordinator role created.");
+  }
+
+  async function syncRoles() {
+    const organizationId = getOrganizationId(currentUser?.organization);
+    if (!organizationId) {
+      onAction("Organization not available for this user.");
+      return;
+    }
+
+    try {
+      await syncOrganizationRoles(organizationId);
+      await refreshOrganizationUsers();
+      onAction("Organization roles are ready.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "Role sync failed.");
+    }
+  }
+
+  async function updateApiRolePermissions(roleId: string, permissions: string[]) {
+    try {
+      await updateRole(roleId, { permissions });
+      await refreshOrganizationUsers();
+      onAction("Role permissions updated.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "Role update failed.");
+    }
   }
 
   function addTask(task: AdminTask) {
@@ -120,6 +251,54 @@ export function AdminSection({
     onAction("Assessment created. Preview is ready.");
   }
 
+  async function createValidatedAssessment(payload: AdminAssessment & { questions?: Array<{ id: string; type: string; text: string; options: string[]; marks: string; correctAnswer?: string }> }) {
+    const organizationId = getOrganizationId(currentUser?.organization);
+    const assignedSection = apiSections.find((section) => section.name === payload.assignedTo);
+    const questions: ApiAssessmentQuestion[] = (payload.questions ?? []).map((question) => ({
+      type: question.type === "MCQ" ? "single-choice" : question.type === "Short Answer" ? "short-answer" : question.type === "Code Question" ? "coding" : "long-answer",
+      text: question.text,
+      options: question.options,
+      correctAnswer: question.correctAnswer || question.options[0] || null,
+      marks: Number(question.marks),
+      negativeMarks: 0,
+    }));
+    const totalMarks = questions.reduce((total, question) => total + question.marks, 0);
+    const apiPayload = {
+      organization: organizationId,
+      title: payload.title,
+      description: payload.type,
+      category: payload.type,
+      difficulty: "intermediate" as const,
+      instructions: payload.instructions,
+      durationMinutes: Number.parseInt(payload.duration, 10) || 60,
+      totalMarks,
+      passingMarks: Math.ceil(totalMarks * 0.4),
+      attemptsAllowed: 1,
+      negativeMarking: false,
+      shuffleQuestions: false,
+      shuffleOptions: false,
+      showResultImmediately: true,
+      allowAnswerReview: true,
+      assignedSections: assignedSection ? [assignedSection._id] : [],
+      assignedTeachers: [],
+      questions,
+      status: "draft" as const,
+    };
+
+    try {
+      const validation = await validateAssessment(apiPayload);
+      if (!validation.valid) {
+        onAction(validation.errors.join("; "));
+        return;
+      }
+      const response = await createAssessmentRecord(apiPayload);
+      await refreshOrganizationWork();
+      onAction(response.message || "Assessment created and validated.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "Assessment validation failed.");
+    }
+  }
+
   if (activeNav === "Students") {
     return (
       <StudentsAdmin
@@ -127,6 +306,7 @@ export function AdminSection({
         students={students}
         selectedStudent={selectedStudent}
         onSelectStudent={setSelectedStudentId}
+        onCreateStudent={createStudent}
         onMoveStudent={moveStudent}
       />
     );
@@ -147,16 +327,20 @@ export function AdminSection({
     );
   }
 
-  if (activeNav === "Coordinators") {
+  if (activeNav === "Coordinators" || activeNav === "Roles and Permissions") {
     return (
       <CoordinatorsAdmin
         coordinators={coordinators}
         organizationUsers={organizationUsers}
+        apiRoles={apiRoles}
+        apiPermissions={apiPermissions}
         roles={roles}
         sections={sections}
         onAddCoordinator={addCoordinator}
         onAddRole={addRole}
         onCreateOrganizationUser={createOrganizationUser}
+        onSyncRoles={syncRoles}
+        onUpdateApiRolePermissions={updateApiRolePermissions}
       />
     );
   }
@@ -166,7 +350,7 @@ export function AdminSection({
   }
 
   if (activeNav === "Assessments") {
-    return <AssessmentsAdmin assessments={assessments} sections={sections} onAddAssessment={addAssessment} />;
+    return <AssessmentsAdmin assessments={assessments} sections={sections} onAddAssessment={addAssessment} onCreateValidatedAssessment={createValidatedAssessment} />;
   }
 
   if (activeNav === "Announcements") return <AnnouncementsAdmin onAction={onAction} sections={sections} />;
@@ -175,6 +359,62 @@ export function AdminSection({
   if (activeNav === "Groups") return <GroupsAdmin onAction={onAction} />;
 
   return <AdminDashboard sections={sections} students={students} coordinators={coordinators} tasks={tasks} assessments={assessments} onAction={onAction} />;
+}
+
+function getOrganizationId(organization: SessionUser["organization"] | undefined) {
+  if (!organization) return undefined;
+  return typeof organization === "string" ? organization : organization._id;
+}
+
+function mapSection(section: ApiSection): SectionRow {
+  return {
+    id: section._id,
+    name: section.name,
+    code: section.code,
+    department: section.department,
+    batch: section.batch,
+    academicYear: section.academicYear,
+    students: 0,
+    coordinator: section.assignedTeachers.map((teacher) => teacher.name).join(", ") || "Unassigned",
+    readiness: 0,
+    status: section.status === "active" ? "Active" : "Inactive",
+    description: section.description,
+  };
+}
+
+function mapStudentUser(user: ApiUser): AdminStudentRow {
+  const sectionName = typeof user.section === "object" && user.section ? user.section.name : "Unassigned";
+
+  return {
+    id: user.id,
+    name: user.name,
+    rollNo: user.registrationNumber || user.id.slice(-6),
+    email: user.email,
+    phone: user.phoneNumber || "",
+    section: sectionName,
+    groups: user.groups?.join(", ") || "General",
+    aptitude: user.preparationScore || 0,
+    coding: user.preparationScore || 0,
+    communication: user.preparationScore || 0,
+    interview: user.preparationScore || 0,
+    readiness: user.preparationScore || 0,
+    pending: 0,
+    status: user.status === "active" ? "Active" : "Inactive",
+    placementStatus: "In process",
+  };
+}
+
+function mapAssessment(assessment: ApiAssessment): AdminAssessment {
+  return {
+    id: assessment._id,
+    title: assessment.title,
+    type: assessment.category,
+    assignedTo: assessment.assignedSections.map((section) => section.name).join(", ") || "Unassigned",
+    duration: `${assessment.durationMinutes} min`,
+    instructions: assessment.instructions,
+    rubric: `${assessment.passingMarks}/${assessment.totalMarks} passing`,
+    status: `${assessment.status} · ${assessment.questions.length} questions`,
+  };
 }
 
 function AdminDashboard({
@@ -275,7 +515,7 @@ function StudentDetail({
 }: {
   student: AdminStudentRow;
   sections: SectionRow[];
-  onMoveStudent: (studentId: string, sectionName: string) => void;
+  onMoveStudent: (studentId: string, sectionName: string) => Promise<void>;
 }) {
   return (
     <Card>
@@ -338,15 +578,27 @@ function StudentsAdmin({
   students,
   selectedStudent,
   onSelectStudent,
+  onCreateStudent,
   onMoveStudent,
 }: {
   sections: SectionRow[];
   students: AdminStudentRow[];
   selectedStudent: AdminStudentRow;
   onSelectStudent: (studentId: string) => void;
-  onMoveStudent: (studentId: string, sectionName: string) => void;
+  onCreateStudent: (user: {
+    name: string;
+    email: string;
+    phoneNumber: string;
+    registrationNumber: string;
+    department: string;
+    batch: string;
+    section?: string;
+    password?: string;
+  }) => Promise<void>;
+  onMoveStudent: (studentId: string, sectionName: string) => Promise<void>;
 }) {
   const [sectionFilter, setSectionFilter] = useState(sections[0]?.name ?? "");
+  const [showCreate, setShowCreate] = useState(false);
   const filteredStudents = students.filter((student) => student.section === sectionFilter);
 
   return (
@@ -356,12 +608,13 @@ function StudentsAdmin({
         title="Students are managed through sections."
         description="Filter by section, open a student profile, review progress, and move students between sections."
         action={
-          <Button>
+          <Button onClick={() => setShowCreate((value) => !value)}>
             <UserPlus className="h-4 w-4" />
             Add Student
           </Button>
         }
       />
+      {showCreate ? <CreateStudentForm sections={sections} onCreateStudent={onCreateStudent} /> : null}
       <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
         <Card>
           <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between md:space-y-0">
@@ -404,6 +657,70 @@ function StudentsAdmin({
   );
 }
 
+function CreateStudentForm({
+  sections,
+  onCreateStudent,
+}: {
+  sections: SectionRow[];
+  onCreateStudent: (user: {
+    name: string;
+    email: string;
+    phoneNumber: string;
+    registrationNumber: string;
+    department: string;
+    batch: string;
+    section?: string;
+    password?: string;
+  }) => Promise<void>;
+}) {
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phoneNumber: "",
+    registrationNumber: "",
+    department: sections[0]?.department ?? "Computer Science",
+    batch: sections[0]?.batch ?? "2027",
+    section: sections[0]?.id ?? "",
+    password: "",
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Add Student</CardTitle>
+        <CardDescription>Create a student account and assign an initial section.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form
+          className="grid gap-3 md:grid-cols-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onCreateStudent({
+              ...form,
+              section: form.section || undefined,
+              password: form.password.trim() || undefined,
+            });
+            setForm((current) => ({ ...current, name: "", email: "", phoneNumber: "", registrationNumber: "", password: "" }));
+          }}
+        >
+          <Input required placeholder="Student name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
+          <Input required type="email" placeholder="student@gmail.com" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
+          <Input placeholder="Phone number" value={form.phoneNumber} onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))} />
+          <Input required placeholder="Registration number" value={form.registrationNumber} onChange={(event) => setForm((current) => ({ ...current, registrationNumber: event.target.value }))} />
+          <Input required placeholder="Department" value={form.department} onChange={(event) => setForm((current) => ({ ...current, department: event.target.value }))} />
+          <Input required placeholder="Batch" value={form.batch} onChange={(event) => setForm((current) => ({ ...current, batch: event.target.value }))} />
+          <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={form.section} onChange={(event) => setForm((current) => ({ ...current, section: event.target.value }))}>
+            <option value="">No section</option>
+            {sections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
+          </select>
+          <Input placeholder="Password optional" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} />
+          <Button className="md:col-span-4" type="submit">Create Student</Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
 function SectionsAdmin({
   sections,
   students,
@@ -418,10 +735,10 @@ function SectionsAdmin({
   students: AdminStudentRow[];
   selectedSection: SectionRow;
   selectedStudent: AdminStudentRow;
-  onCreateSection: (section: SectionRow) => void;
+  onCreateSection: (section: SectionRow) => Promise<void>;
   onSelectSection: (sectionId: string) => void;
   onSelectStudent: (studentId: string) => void;
-  onMoveStudent: (studentId: string, sectionName: string) => void;
+  onMoveStudent: (studentId: string, sectionName: string) => Promise<void>;
 }) {
   const [showForm, setShowForm] = useState(false);
   const sectionStudents = students.filter((student) => student.section === selectedSection.name);
@@ -511,7 +828,7 @@ function SectionsAdmin({
   );
 }
 
-function CreateSectionForm({ onCreateSection }: { onCreateSection: (section: SectionRow) => void }) {
+function CreateSectionForm({ onCreateSection }: { onCreateSection: (section: SectionRow) => Promise<void> }) {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [department, setDepartment] = useState("Computer Science");
@@ -560,17 +877,23 @@ function CreateSectionForm({ onCreateSection }: { onCreateSection: (section: Sec
 function CoordinatorsAdmin({
   coordinators,
   organizationUsers,
+  apiRoles,
+  apiPermissions,
   roles,
   sections,
   onAddCoordinator,
   onAddRole,
   onCreateOrganizationUser,
+  onSyncRoles,
+  onUpdateApiRolePermissions,
 }: {
   coordinators: CoordinatorRow[];
   organizationUsers: ApiUser[];
+  apiRoles: ApiRole[];
+  apiPermissions: string[];
   roles: CoordinatorRole[];
   sections: SectionRow[];
-  onAddCoordinator: (coordinator: CoordinatorRow) => void;
+  onAddCoordinator: (coordinator: CoordinatorRow, teacherId?: string) => Promise<void>;
   onAddRole: (role: CoordinatorRole) => void;
   onCreateOrganizationUser: (user: {
     name: string;
@@ -578,7 +901,9 @@ function CoordinatorsAdmin({
     phoneNumber: string;
     roleName: "teacher" | "student" | "admin";
     password?: string;
-  }) => Promise<void>;
+  }) => Promise<ApiUser | undefined>;
+  onSyncRoles: () => Promise<void>;
+  onUpdateApiRolePermissions: (roleId: string, permissions: string[]) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -595,6 +920,7 @@ function CoordinatorsAdmin({
         eyebrow="Coordinators"
         title="Add coordinators and create permission roles."
         description="Coordinator access is role-based, and coordinators can be assigned to sections and workflows."
+        action={<Button onClick={onSyncRoles}><ShieldCheck className="h-4 w-4" />Sync Roles</Button>}
       />
       <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_430px]">
         <Card>
@@ -605,9 +931,9 @@ function CoordinatorsAdmin({
           <CardContent>
             <form
               className="grid gap-3 md:grid-cols-2"
-              onSubmit={(event) => {
+              onSubmit={async (event) => {
                 event.preventDefault();
-                onAddCoordinator({
+                const coordinator = {
                   id: crypto.randomUUID(),
                   name: name || "New Coordinator",
                   email: email || "coordinator@example.edu",
@@ -615,14 +941,15 @@ function CoordinatorsAdmin({
                   role,
                   sections: [section],
                   status: "Active",
-                });
-                onCreateOrganizationUser({
+                };
+                const createdUser = await onCreateOrganizationUser({
                   name: name || "New Coordinator",
                   email: email || "coordinator@example.edu",
                   phoneNumber: phoneNumber || "+91 90000 00000",
                   roleName: "teacher",
                   password: password.trim() || undefined,
                 });
+                await onAddCoordinator(coordinator, createdUser?.id);
                 setName("");
                 setEmail("");
                 setPhoneNumber("");
@@ -703,7 +1030,31 @@ function CoordinatorsAdmin({
             <CardDescription>Coordinator role-based access.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {roles.map((item) => (
+            {apiRoles.length ? apiRoles.map((item) => (
+              <div key={item._id} className="rounded-lg border p-3">
+                <p className="font-semibold">{item.displayName}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{item.name}</p>
+                <div className="mt-3 grid gap-2">
+                  {apiPermissions.map((permission) => (
+                    <label key={permission} className="flex items-center gap-2 text-sm">
+                      <input
+                        className="h-4 w-4 accent-primary"
+                        type="checkbox"
+                        disabled={!item.isEditable}
+                        checked={item.permissions.includes(permission)}
+                        onChange={(event) => {
+                          const nextPermissions = event.target.checked
+                            ? [...item.permissions, permission]
+                            : item.permissions.filter((current) => current !== permission);
+                          onUpdateApiRolePermissions(item._id, nextPermissions);
+                        }}
+                      />
+                      {permission}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )) : roles.map((item) => (
               <div key={item.id} className="rounded-lg border p-3">
                 <p className="font-semibold">{item.name}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -802,7 +1153,17 @@ function StudentTaskPreview({ title, type, assignedTo }: { title: string; type: 
   );
 }
 
-function AssessmentsAdmin({ assessments, sections, onAddAssessment }: { assessments: AdminAssessment[]; sections: SectionRow[]; onAddAssessment: (assessment: AdminAssessment) => void }) {
+function AssessmentsAdmin({
+  assessments,
+  sections,
+  onAddAssessment,
+  onCreateValidatedAssessment,
+}: {
+  assessments: AdminAssessment[];
+  sections: SectionRow[];
+  onAddAssessment: (assessment: AdminAssessment) => void;
+  onCreateValidatedAssessment: (assessment: AdminAssessment & { questions: Array<{ id: string; type: string; text: string; options: string[]; marks: string; correctAnswer?: string }> }) => Promise<void>;
+}) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState("Written Test");
   const [assignedTo, setAssignedTo] = useState(sections[0]?.name ?? "");
@@ -912,8 +1273,15 @@ function AssessmentsAdmin({ assessments, sections, onAddAssessment }: { assessme
                 ))}
               </div>
             </div>
-            <Button className="w-full" onClick={() => onAddAssessment({ id: crypto.randomUUID(), title: previewTitle, type, assignedTo, duration: "60 min", instructions, rubric, status: `Draft · ${questions.length} questions` })}>
-              Create Assessment
+            <Button
+              className="w-full"
+              onClick={() => {
+                const assessment = { id: crypto.randomUUID(), title: previewTitle, type, assignedTo, duration: "60 min", instructions, rubric, status: `Draft · ${questions.length} questions`, questions };
+                onAddAssessment(assessment);
+                onCreateValidatedAssessment(assessment);
+              }}
+            >
+              Validate & Create Assessment
             </Button>
           </CardContent>
         </Card>

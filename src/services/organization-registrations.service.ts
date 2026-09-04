@@ -19,7 +19,9 @@ export function createOrganizationRegistration(payload: OrganizationRegistration
 }
 
 export function listOrganizationRegistrations(status?: "pending" | "accepted" | "rejected") {
-  return apiFetch<RegisterOrg[]>(API_ENDPOINTS.organizationRegistrations.list(status));
+  return apiFetch<{ registrations: RegisterOrg[] }>(API_ENDPOINTS.organizationRegistrations.list(status)).then(
+    (response) => response.registrations,
+  );
 }
 
 export function approveOrganizationRegistration(

@@ -33,6 +33,7 @@ export type OrganizationRequest = {
   id: string;
   name: string;
   contact: string;
+  featureIds?: string[];
   requestedPlan: string;
   status: string;
   submitted: string;

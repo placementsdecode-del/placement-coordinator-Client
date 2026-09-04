@@ -1,4 +1,5 @@
-export const API_BASE_URL = "https://server-qx2zb1ac5-sleep-16dd15c4.vercel.app";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "https://server-dxpw1mw7v-sleep-16dd15c4.vercel.app";
 
 export const ACCESS_TOKEN_KEY = "accessToken";
 
@@ -15,6 +16,7 @@ export const API_ENDPOINTS = {
   organizations: {
     list: "/api/organizations",
     detail: (organizationId: string) => `/api/organizations/${organizationId}`,
+    update: (organizationId: string) => `/api/organizations/${organizationId}`,
   },
   organizationRegistrations: {
     create: "/api/org-registrations",
@@ -26,5 +28,25 @@ export const API_ENDPOINTS = {
   users: {
     list: (organizationId?: string | null) => `/api/users${organizationId ? `?organization=${organizationId}` : ""}`,
     create: "/api/users",
+    update: (userId: string) => `/api/users/${userId}`,
+  },
+  roles: {
+    list: (organizationId?: string | null) => `/api/roles${organizationId ? `?organization=${organizationId}` : ""}`,
+    permissions: "/api/roles/permissions",
+    sync: (organizationId: string) => `/api/roles/organizations/${organizationId}/sync`,
+    update: (roleId: string) => `/api/roles/${roleId}`,
+  },
+  sections: {
+    list: (organizationId?: string | null) => `/api/sections${organizationId ? `?organization=${organizationId}` : ""}`,
+    create: "/api/sections",
+    update: (sectionId: string) => `/api/sections/${sectionId}`,
+    assignStudent: (sectionId: string, studentId: string) => `/api/sections/${sectionId}/students/${studentId}`,
+  },
+  assessments: {
+    list: (organizationId?: string | null) => `/api/assessments${organizationId ? `?organization=${organizationId}` : ""}`,
+    create: "/api/assessments",
+    validate: "/api/assessments/validate",
+    update: (assessmentId: string) => `/api/assessments/${assessmentId}`,
+    validateExisting: (assessmentId: string) => `/api/assessments/${assessmentId}/validate`,
   },
 } as const;

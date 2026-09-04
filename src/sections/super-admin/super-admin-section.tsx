@@ -14,16 +14,20 @@ import {
   listOrganizationRegistrations,
   rejectOrganizationRegistration,
 } from "@/services/organization-registrations.service";
-import { listOrganizations } from "@/services/organizations.service";
-import { createUser as createUserRecord, listUsers } from "@/services/users.service";
-import type { AcceptedOrganization, ApiUser, Feature, RegisterOrg } from "@/types/api";
+import { listOrganizations, updateOrganization } from "@/services/organizations.service";
+import { listPermissions, listRoles, syncOrganizationRoles, updateRole } from "@/services/roles.service";
+import { createUser as createUserRecord, listUsers, updateUser } from "@/services/users.service";
+import type { AcceptedOrganization, ApiRole, ApiUser, Feature, RegisterOrg } from "@/types/api";
 import type { CommitEntry, OrganizationRequest, OrganizationRow, SuperAdminNavLabel } from "@/types/super-admin";
 
 export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdminNavLabel; onAction: (message: string) => void }) {
   const [orgRows, setOrgRows] = useState<OrganizationRow[]>(organizations);
+  const [apiOrganizations, setApiOrganizations] = useState<AcceptedOrganization[]>([]);
   const [requests, setRequests] = useState<OrganizationRequest[]>(organizationRequests);
   const [apiUsers, setApiUsers] = useState<ApiUser[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
+  const [roles, setRoles] = useState<ApiRole[]>([]);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [loadError, setLoadError] = useState("");
   const [selectedOrgId, setSelectedOrgId] = useState(orgRows[0]?.id ?? "");
   const selectedOrg = orgRows.find((org) => org.id === selectedOrgId) ?? orgRows[0];
@@ -31,17 +35,22 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
   async function refreshPlatformData() {
     setLoadError("");
     try {
-      const [registrations, acceptedOrganizations, users, featureRows] = await Promise.all([
+      const [registrations, acceptedOrganizations, users, featureRows, roleRows, permissionRows] = await Promise.all([
         listOrganizationRegistrations("pending"),
         listOrganizations(),
         listUsers(),
         listFeatures(),
+        listRoles(),
+        listPermissions(),
       ]);
       const mappedOrganizations = acceptedOrganizations.map(mapOrganization);
       setRequests(registrations.map(mapRegistration));
+      setApiOrganizations(acceptedOrganizations);
       setOrgRows(mappedOrganizations.length ? mappedOrganizations : organizations);
       setApiUsers(users);
       setFeatures(featureRows);
+      setRoles(roleRows);
+      setPermissions(permissionRows);
       setSelectedOrgId((current) => mappedOrganizations.find((org) => org.id === current)?.id ?? mappedOrganizations[0]?.id ?? current);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Unable to load platform data.");
@@ -52,16 +61,31 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
     refreshPlatformData();
   }, []);
 
-  function updateOrgStatus(orgId: string, status: string) {
-    setOrgRows((items) => items.map((org) => (org.id === orgId ? { ...org, status } : org)));
-    onAction(`Organization ${status.toLowerCase()}.`);
+  async function updateOrgStatus(orgId: string, status: string) {
+    try {
+      await updateOrganization(orgId, { status: status === "Active" ? "active" : "suspended" });
+      await refreshPlatformData();
+      onAction(`Organization ${status.toLowerCase()}.`);
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "Organization update failed.");
+    }
+  }
+
+  async function updateOrgDetails(orgId: string, payload: Partial<AcceptedOrganization>) {
+    try {
+      await updateOrganization(orgId, payload);
+      await refreshPlatformData();
+      onAction("Organization details updated.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "Organization update failed.");
+    }
   }
 
   async function handleRequest(requestId: string, status: string) {
     try {
       if (status === "Approved") {
         await approveOrganizationRegistration(requestId, {
-          features: [],
+          features: requests.find((request) => request.id === requestId)?.featureIds ?? [],
           adminName: "Organization Admin",
           discussionNotes: "Approved from frontend console.",
         });
@@ -76,17 +100,38 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
   }
 
   if (activeNav === "Organizations") {
-    return <OrganizationsPage organizations={orgRows} selectedOrg={selectedOrg} loadError={loadError} onSelectOrg={setSelectedOrgId} onUpdateStatus={updateOrgStatus} />;
+    return (
+      <OrganizationsPage
+        organizations={orgRows}
+        apiOrganizations={apiOrganizations}
+        selectedOrg={selectedOrg}
+        loadError={loadError}
+        onSelectOrg={setSelectedOrgId}
+        onUpdateDetails={updateOrgDetails}
+        onUpdateStatus={updateOrgStatus}
+      />
+    );
   }
   if (activeNav === "Requests") return <RequestsPage requests={requests} loadError={loadError} onHandleRequest={handleRequest} />;
-  if (activeNav === "Users") return <UsersPage apiUsers={apiUsers} onUserCreated={refreshPlatformData} onAction={onAction} />;
+  if (activeNav === "Users") return <UsersPage apiUsers={apiUsers} organizations={apiOrganizations} onUserChanged={refreshPlatformData} onAction={onAction} />;
+  if (activeNav === "Settings") {
+    return (
+      <RolesSettingsPage
+        organizations={apiOrganizations}
+        permissions={permissions}
+        roles={roles}
+        onRoleChanged={refreshPlatformData}
+        onAction={onAction}
+      />
+    );
+  }
   if (activeNav === "Features") return <FeaturesPage features={features} onFeatureChanged={refreshPlatformData} onAction={onAction} />;
   if (activeNav === "Plans") return <PlansPage onAction={onAction} />;
   if (activeNav === "Analytics") return <AnalyticsPage organizations={orgRows} />;
   if (activeNav === "Support") return <SupportPage onAction={onAction} />;
   if (activeNav === "Audit Logs") return <AuditPage />;
   if (activeNav === "Changelog") return <ChangelogPage />;
-  if (activeNav === "Settings") return <PlatformSettingsPage onAction={onAction} />;
+  
 
   return <SuperAdminDashboard organizations={orgRows} requests={requests} onAction={onAction} />;
 }
@@ -96,6 +141,7 @@ function mapRegistration(registration: RegisterOrg): OrganizationRequest {
     id: registration._id,
     name: registration.orgName,
     contact: registration.orgEmail,
+    featureIds: registration.requestedFeatures.map((feature) => (typeof feature === "string" ? feature : feature._id)),
     requestedPlan: featureNames(registration.requestedFeatures),
     status: registration.status === "pending" ? "New" : registration.status,
     submitted: registration.externalId ?? "Submitted",
@@ -117,6 +163,11 @@ function mapOrganization(organization: AcceptedOrganization): OrganizationRow {
 
 function featureNames(features: string[] | Feature[]) {
   return features.map((feature) => (typeof feature === "string" ? feature : feature.name)).filter(Boolean).join(", ");
+}
+
+function organizationLabel(organization: ApiUser["organization"]) {
+  if (!organization) return "No organization";
+  return typeof organization === "string" ? organization : organization.orgName || organization._id;
 }
 
 function SuperAdminDashboard({
@@ -206,17 +257,43 @@ function SuperAdminDashboard({
 
 function OrganizationsPage({
   organizations,
+  apiOrganizations,
   selectedOrg,
   loadError,
   onSelectOrg,
+  onUpdateDetails,
   onUpdateStatus,
 }: {
   organizations: OrganizationRow[];
+  apiOrganizations: AcceptedOrganization[];
   selectedOrg: OrganizationRow;
   loadError: string;
   onSelectOrg: (orgId: string) => void;
-  onUpdateStatus: (orgId: string, status: string) => void;
+  onUpdateDetails: (orgId: string, payload: Partial<AcceptedOrganization>) => Promise<void>;
+  onUpdateStatus: (orgId: string, status: string) => Promise<void>;
 }) {
+  const selectedApiOrg = apiOrganizations.find((organization) => organization._id === selectedOrg.id);
+  const [form, setForm] = useState({
+    orgName: selectedApiOrg?.orgName ?? selectedOrg.name,
+    orgEmail: selectedApiOrg?.orgEmail ?? "",
+    phoneNumber: selectedApiOrg?.phoneNumber ?? "",
+    address: selectedApiOrg?.address ?? selectedOrg.region,
+  });
+
+  useEffect(() => {
+    setForm({
+      orgName: selectedApiOrg?.orgName ?? selectedOrg.name,
+      orgEmail: selectedApiOrg?.orgEmail ?? "",
+      phoneNumber: selectedApiOrg?.phoneNumber ?? "",
+      address: selectedApiOrg?.address ?? selectedOrg.region,
+    });
+  }, [selectedApiOrg?._id, selectedOrg.id]);
+
+  async function submitDetails(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onUpdateDetails(selectedOrg.id, form);
+  }
+
   return (
     <>
       <SectionIntro
@@ -263,6 +340,19 @@ function OrganizationsPage({
               <InfoTile label="Coordinators" value={String(selectedOrg.coordinators)} />
             </div>
             <DonutProgress value={selectedOrg.usage} label="Usage" caption="Current tenant resource usage" />
+            <form className="grid gap-2" onSubmit={submitDetails}>
+              <Input required placeholder="Organization name" value={form.orgName} onChange={(event) => setForm((current) => ({ ...current, orgName: event.target.value }))} />
+              <Input required type="email" placeholder="Organization email" value={form.orgEmail} onChange={(event) => setForm((current) => ({ ...current, orgEmail: event.target.value }))} />
+              <Input required placeholder="Phone number" value={form.phoneNumber} onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))} />
+              <textarea
+                required
+                className="min-h-20 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
+                placeholder="Address"
+                value={form.address}
+                onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
+              />
+              <Button type="submit" variant="outline">Update Details</Button>
+            </form>
             <div className="grid gap-2 sm:grid-cols-2">
               <Button variant="outline" onClick={() => onUpdateStatus(selectedOrg.id, "Active")}>Activate</Button>
               <Button variant="outline" onClick={() => onUpdateStatus(selectedOrg.id, "Suspended")}>Suspend</Button>
@@ -321,19 +411,26 @@ function RequestsPage({
 
 function UsersPage({
   apiUsers,
-  onUserCreated,
+  organizations,
+  onUserChanged,
   onAction,
 }: {
   apiUsers: ApiUser[];
-  onUserCreated: () => Promise<void>;
+  organizations: AcceptedOrganization[];
+  onUserChanged: () => Promise<void>;
   onAction: (message: string) => void;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [organization, setOrganization] = useState("");
+  const [organization, setOrganization] = useState(organizations[0]?._id ?? "");
   const [roleName, setRoleName] = useState("teacher");
   const [password, setPassword] = useState("");
-  const users = apiUsers.length ? apiUsers : platformUsers;
+  const hasApiUsers = apiUsers.length > 0;
+  const users = hasApiUsers ? apiUsers : platformUsers;
+
+  useEffect(() => {
+    setOrganization((current) => current || organizations[0]?._id || "");
+  }, [organizations]);
 
   async function createUser(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -345,13 +442,33 @@ function UsersPage({
         roleName: roleName as "admin" | "teacher" | "student",
         password: password.trim() || undefined,
       });
-      await onUserCreated();
+      await onUserChanged();
       setName("");
       setEmail("");
       setPassword("");
       onAction(response.temporaryPassword ? `User created. Temporary password: ${response.temporaryPassword}` : response.message || "User created.");
     } catch (error) {
       onAction(error instanceof Error ? error.message : "User creation failed.");
+    }
+  }
+
+  async function changeUserRole(userId: string, nextRole: "admin" | "teacher" | "student") {
+    try {
+      await updateUser(userId, { roleName: nextRole });
+      await onUserChanged();
+      onAction("User role updated.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "Role assignment failed.");
+    }
+  }
+
+  async function toggleUserStatus(user: ApiUser) {
+    try {
+      await updateUser(user.id, { status: user.status === "active" ? "inactive" : "active" });
+      await onUserChanged();
+      onAction("User status updated.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "User update failed.");
     }
   }
 
@@ -371,7 +488,10 @@ function UsersPage({
           <form className="grid gap-3 md:grid-cols-5" onSubmit={createUser}>
             <Input required placeholder="Name" value={name} onChange={(event) => setName(event.target.value)} />
             <Input required type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} />
-            <Input placeholder="Organization id" value={organization} onChange={(event) => setOrganization(event.target.value)} />
+            <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={organization} onChange={(event) => setOrganization(event.target.value)}>
+              <option value="">Select organization</option>
+              {organizations.map((item) => <option key={item._id} value={item._id}>{item.orgName}</option>)}
+            </select>
             <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={roleName} onChange={(event) => setRoleName(event.target.value)}>
               <option value="admin">Admin</option>
               <option value="teacher">Teacher</option>
@@ -385,13 +505,25 @@ function UsersPage({
       <Card>
         <CardContent className="space-y-3 p-4 sm:p-5">
           {users.map((user) => (
-            <div key={user.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_180px_110px] md:items-center">
+            <div key={user.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_150px_130px_150px] md:items-center">
               <div>
                 <p className="font-semibold">{user.name}</p>
-                <p className="text-sm text-muted-foreground">{user.email} · {user.organization || "No organization"}</p>
+                <p className="text-sm text-muted-foreground">{user.email} · {organizationLabel(user.organization)}</p>
               </div>
-              <Badge variant="outline">{user.role}</Badge>
+              <select
+                className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
+                value={user.role === "superadmin" || user.role === "Super Admin" ? "admin" : user.role}
+                disabled={!hasApiUsers || user.role === "superadmin" || user.role === "Super Admin"}
+                onChange={(event) => changeUserRole(user.id, event.target.value as "admin" | "teacher" | "student")}
+              >
+                <option value="admin">Admin</option>
+                <option value="teacher">Teacher</option>
+                <option value="student">Student</option>
+              </select>
               <Badge variant={user.status === "active" || user.status === "Active" ? "secondary" : "warning"}>{user.status}</Badge>
+              <Button size="sm" variant="outline" disabled={!hasApiUsers || user.role === "superadmin" || user.role === "Super Admin"} onClick={() => toggleUserStatus(user as ApiUser)}>
+                {user.status === "active" ? "Deactivate" : "Activate"}
+              </Button>
             </div>
           ))}
         </CardContent>
@@ -494,6 +626,107 @@ function ApiNotice({ message }: { message: string }) {
     <div className="rounded-md border border-accent/50 bg-accent/20 p-3 text-sm text-muted-foreground">
       API data unavailable: {message}. Showing local demo data where available.
     </div>
+  );
+}
+
+function RolesSettingsPage({
+  organizations,
+  permissions,
+  roles,
+  onRoleChanged,
+  onAction,
+}: {
+  organizations: AcceptedOrganization[];
+  permissions: string[];
+  roles: ApiRole[];
+  onRoleChanged: () => Promise<void>;
+  onAction: (message: string) => void;
+}) {
+  const [organizationId, setOrganizationId] = useState(organizations[0]?._id ?? "");
+  const visibleRoles = roles.filter((role) => !organizationId || role.organization === organizationId || (typeof role.organization === "object" && role.organization?._id === organizationId));
+
+  useEffect(() => {
+    setOrganizationId((current) => current || organizations[0]?._id || "");
+  }, [organizations]);
+
+  async function syncRoles() {
+    if (!organizationId) {
+      onAction("Select an organization first.");
+      return;
+    }
+
+    try {
+      await syncOrganizationRoles(organizationId);
+      await onRoleChanged();
+      onAction("Organization roles are ready.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "Role sync failed.");
+    }
+  }
+
+  async function saveRole(role: ApiRole, nextPermissions: string[]) {
+    try {
+      await updateRole(role._id, { permissions: nextPermissions });
+      await onRoleChanged();
+      onAction("Role permissions updated.");
+    } catch (error) {
+      onAction(error instanceof Error ? error.message : "Role update failed.");
+    }
+  }
+
+  return (
+    <>
+      <SectionIntro
+        eyebrow="Roles"
+        title="Create organization roles and update permissions."
+        description="Sync default organization roles, then assign permissions and use the Users page to assign roles to people."
+        action={<Button onClick={syncRoles}><ShieldCheck className="h-4 w-4" />Sync Roles</Button>}
+      />
+      <Card>
+        <CardHeader>
+          <CardTitle>Organization</CardTitle>
+          <CardDescription>Choose the tenant whose roles you want to manage.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <select className="h-10 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}>
+            <option value="">All roles</option>
+            {organizations.map((organization) => <option key={organization._id} value={organization._id}>{organization.orgName}</option>)}
+          </select>
+        </CardContent>
+      </Card>
+      <section className="grid gap-4 lg:grid-cols-3">
+        {visibleRoles.map((role) => (
+          <Card key={role._id}>
+            <CardHeader>
+              <CardTitle>{role.displayName}</CardTitle>
+              <CardDescription>{role.name} · {role.isEditable ? "Editable" : "Locked"}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">{role.description}</p>
+              <div className="space-y-2">
+                {permissions.map((permission) => (
+                  <label key={permission} className="flex items-center gap-2 text-sm">
+                    <input
+                      className="h-4 w-4 accent-primary"
+                      type="checkbox"
+                      disabled={!role.isEditable}
+                      checked={role.permissions.includes(permission)}
+                      onChange={(event) => {
+                        const nextPermissions = event.target.checked
+                          ? [...role.permissions, permission]
+                          : role.permissions.filter((item) => item !== permission);
+                        saveRole(role, nextPermissions);
+                      }}
+                    />
+                    {permission}
+                  </label>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+    </>
   );
 }
 

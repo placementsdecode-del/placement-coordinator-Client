@@ -4,6 +4,22 @@ import type { CommitEntry } from "@/types/super-admin";
 // `files` is capped at the top 12 changed files per commit; `filesChanged` is the true total.
 export const commitHistory: CommitEntry[] = [
   {
+    hash: "6d8bb95",
+    author: "naveed-devz",
+    date: "2026-08-23",
+    message: "removed auth",
+    area: "Authentication",
+    body: "",
+    filesChanged: 3,
+    insertions: 122,
+    deletions: 158,
+    files: [
+        { path: "src/components/layout/landing-screen.tsx", added: 87, removed: 107, patch: "", patchTruncated: false },
+        { path: "src/App.tsx", added: 10, removed: 51, patch: "", patchTruncated: false },
+        { path: "src/data/commit-history.ts", added: 25, removed: 0, patch: "", patchTruncated: false },
+    ],
+  },
+  {
     hash: "a88bd48",
     author: "naveed-devz",
     date: "2026-07-28",
