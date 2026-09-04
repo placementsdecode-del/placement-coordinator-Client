@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BarChart3, Check, ChevronDown, ChevronRight, CreditCard, FileText, GitCommitHorizontal, LifeBuoy, LoaderCircle, Plus, Settings, ShieldCheck, X } from "lucide-react";
+import { ChangePasswordCard } from "@/components/common/change-password-card";
 import { DonutProgress } from "@/components/common/donut-progress";
 import { SectionIntro } from "@/components/common/section-intro";
 import { Badge } from "@/components/ui/badge";
@@ -1096,6 +1097,7 @@ function PlatformSettingsPage({ onAction }: { onAction: (message: string) => voi
           <Input defaultValue="Audit retention 365 days" />
         </CardContent>
       </Card>
+      <ChangePasswordCard />
     </>
   );
 }

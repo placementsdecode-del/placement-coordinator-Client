@@ -4,6 +4,27 @@ import type { CommitEntry } from "@/types/super-admin";
 // `files` is capped at the top 12 changed files per commit; `filesChanged` is the true total.
 export const commitHistory: CommitEntry[] = [
   {
+    hash: "950f749",
+    author: "naveed-devz",
+    date: "2026-09-04",
+    message: "Collect organization location during registration",
+    area: "Platform",
+    body: "",
+    filesChanged: 8,
+    insertions: 94,
+    deletions: 8,
+    files: [
+        { path: "src/data/commit-history.ts", added: 25, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/sections/super-admin/super-admin-section.tsx", added: 24, removed: 1, patch: "", patchTruncated: false },
+        { path: "src/pages/public/organization-registration/containers/organization-registration-container.tsx", added: 13, removed: 1, patch: "", patchTruncated: false },
+        { path: "src/types/api.ts", added: 12, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/pages/public/organization-registration/organization-registration.constants.ts", added: 5, removed: 2, patch: "", patchTruncated: false },
+        { path: "src/pages/public/organization-registration/organization-registration.types.ts", added: 5, removed: 2, patch: "", patchTruncated: false },
+        { path: "src/services/organization-registrations.service.ts", added: 6, removed: 1, patch: "", patchTruncated: false },
+        { path: "src/pages/public/organization-registration/components/registration-form.tsx", added: 4, removed: 1, patch: "", patchTruncated: false },
+    ],
+  },
+  {
     hash: "45f3d4f",
     author: "naveed-devz",
     date: "2026-09-04",

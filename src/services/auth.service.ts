@@ -13,3 +13,10 @@ export async function getCurrentUser() {
   const response = await apiFetch<{ user: ApiUser } | ApiUser>(API_ENDPOINTS.auth.me);
   return "user" in response ? response.user : response;
 }
+
+export function changePassword(currentPassword: string, newPassword: string) {
+  return apiFetch<{ message: string }>(API_ENDPOINTS.auth.changePassword, {
+    method: "PATCH",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}

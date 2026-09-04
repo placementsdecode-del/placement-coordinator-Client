@@ -1,10 +1,11 @@
 import { Award, BookOpen, BriefcaseBusiness, Code2, FileUp, Link, Mail, Phone, Users } from "lucide-react";
+import { ChangePasswordCard } from "@/components/common/change-password-card";
 import { SectionIntro } from "@/components/common/section-intro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function ProfileSection() {
+export function ProfileSection({ mustChangePassword = false }: { mustChangePassword?: boolean }) {
   const profileRows = [
     { label: "Email", value: "riya.sharma@example.edu", icon: Mail },
     { label: "Phone", value: "+91 98765 43210", icon: Phone },
@@ -83,6 +84,7 @@ export function ProfileSection() {
               ))}
             </CardContent>
           </Card>
+          <ChangePasswordCard mustChangePassword={mustChangePassword} />
         </div>
       </section>
     </>

@@ -1,5 +1,5 @@
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://server-dxpw1mw7v-sleep-16dd15c4.vercel.app";
+  import.meta.env.VITE_API_BASE_URL || "https://server-two-tau-93.vercel.app/";
 
 export const ACCESS_TOKEN_KEY = "accessToken";
 
@@ -7,6 +7,7 @@ export const API_ENDPOINTS = {
   auth: {
     login: "/api/auth/login",
     me: "/api/auth/me",
+    changePassword: "/api/auth/password",
   },
   features: {
     list: "/api/features",

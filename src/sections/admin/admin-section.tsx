@@ -10,6 +10,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
+import { ChangePasswordCard } from "@/components/common/change-password-card";
 import { DonutProgress } from "@/components/common/donut-progress";
 import { SectionIntro } from "@/components/common/section-intro";
 import { Badge } from "@/components/ui/badge";
@@ -1637,6 +1638,7 @@ function SettingsAdmin({ onAction }: { onAction: (message: string) => void }) {
           </CardContent>
         </Card>
 
+        <div className="space-y-4">
         <Card>
           <CardHeader>
             <CardTitle>Student Default Preview</CardTitle>
@@ -1662,6 +1664,8 @@ function SettingsAdmin({ onAction }: { onAction: (message: string) => void }) {
             </div>
           </CardContent>
         </Card>
+        <ChangePasswordCard />
+        </div>
       </section>
     </>
   );

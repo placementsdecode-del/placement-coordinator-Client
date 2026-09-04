@@ -187,7 +187,7 @@ function App() {
       case "Preparation Progress":
         return <PreparationProgressSection />;
       case "Profile":
-        return <ProfileSection />;
+        return <ProfileSection mustChangePassword={currentUser?.mustChangePassword} />;
       default:
         return <DashboardSection taskItems={taskItems} onTaskAction={handleTaskAction} />;
     }
