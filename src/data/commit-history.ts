@@ -4,6 +4,31 @@ import type { CommitEntry } from "@/types/super-admin";
 // `files` is capped at the top 12 changed files per commit; `filesChanged` is the true total.
 export const commitHistory: CommitEntry[] = [
   {
+    hash: "45f3d4f",
+    author: "naveed-devz",
+    date: "2026-09-04",
+    message: "Integrate admin workflows with APIs",
+    area: "Admin",
+    body: "",
+    filesChanged: 16,
+    insertions: 962,
+    deletions: 64,
+    files: [
+        { path: "src/sections/admin/admin-section.tsx", added: 397, removed: 29, patch: "", patchTruncated: false },
+        { path: "src/sections/super-admin/super-admin-section.tsx", added: 254, removed: 21, patch: "", patchTruncated: false },
+        { path: "src/types/api.ts", added: 67, removed: 1, patch: "", patchTruncated: false },
+        { path: "src/App.tsx", added: 56, removed: 4, patch: "", patchTruncated: false },
+        { path: "src/services/assessments.service.ts", added: 42, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/services/sections.service.ts", added: 39, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/services/roles.service.ts", added: 31, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/constants/api.ts", added: 23, removed: 1, patch: "", patchTruncated: false },
+        { path: "src/services/users.service.ts", added: 16, removed: 1, patch: "", patchTruncated: false },
+        { path: "src/data/commit-history.ts", added: 16, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/services/organizations.service.ts", added: 10, removed: 1, patch: "", patchTruncated: false },
+        { path: "src/services/features.service.ts", added: 5, removed: 5, patch: "", patchTruncated: false },
+    ],
+  },
+  {
     hash: "6d8bb95",
     author: "naveed-devz",
     date: "2026-08-23",

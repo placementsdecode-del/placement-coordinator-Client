@@ -277,6 +277,10 @@ function OrganizationsPage({
     orgName: selectedApiOrg?.orgName ?? selectedOrg.name,
     orgEmail: selectedApiOrg?.orgEmail ?? "",
     phoneNumber: selectedApiOrg?.phoneNumber ?? "",
+    country: selectedApiOrg?.location?.country ?? "",
+    state: selectedApiOrg?.location?.state ?? "",
+    city: selectedApiOrg?.location?.city ?? "",
+    postalCode: selectedApiOrg?.location?.postalCode ?? "",
     address: selectedApiOrg?.address ?? selectedOrg.region,
   });
 
@@ -285,13 +289,28 @@ function OrganizationsPage({
       orgName: selectedApiOrg?.orgName ?? selectedOrg.name,
       orgEmail: selectedApiOrg?.orgEmail ?? "",
       phoneNumber: selectedApiOrg?.phoneNumber ?? "",
+      country: selectedApiOrg?.location?.country ?? "",
+      state: selectedApiOrg?.location?.state ?? "",
+      city: selectedApiOrg?.location?.city ?? "",
+      postalCode: selectedApiOrg?.location?.postalCode ?? "",
       address: selectedApiOrg?.address ?? selectedOrg.region,
     });
   }, [selectedApiOrg?._id, selectedOrg.id]);
 
   async function submitDetails(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onUpdateDetails(selectedOrg.id, form);
+    await onUpdateDetails(selectedOrg.id, {
+      orgName: form.orgName,
+      orgEmail: form.orgEmail,
+      phoneNumber: form.phoneNumber,
+      address: form.address,
+      location: {
+        country: form.country,
+        state: form.state,
+        city: form.city,
+        postalCode: form.postalCode,
+      },
+    });
   }
 
   return (
@@ -344,6 +363,10 @@ function OrganizationsPage({
               <Input required placeholder="Organization name" value={form.orgName} onChange={(event) => setForm((current) => ({ ...current, orgName: event.target.value }))} />
               <Input required type="email" placeholder="Organization email" value={form.orgEmail} onChange={(event) => setForm((current) => ({ ...current, orgEmail: event.target.value }))} />
               <Input required placeholder="Phone number" value={form.phoneNumber} onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))} />
+              <Input required placeholder="Country" value={form.country} onChange={(event) => setForm((current) => ({ ...current, country: event.target.value }))} />
+              <Input required placeholder="State" value={form.state} onChange={(event) => setForm((current) => ({ ...current, state: event.target.value }))} />
+              <Input required placeholder="City" value={form.city} onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))} />
+              <Input required placeholder="Postal code" value={form.postalCode} onChange={(event) => setForm((current) => ({ ...current, postalCode: event.target.value }))} />
               <textarea
                 required
                 className="min-h-20 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"

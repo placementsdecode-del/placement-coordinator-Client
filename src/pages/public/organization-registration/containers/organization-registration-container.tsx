@@ -45,7 +45,19 @@ export function OrganizationRegistrationContainer() {
     setError("");
     setSuccess("");
     try {
-      const response = await createOrganizationRegistration({ ...form, requestedFeatures: selectedFeatures });
+      const response = await createOrganizationRegistration({
+        orgName: form.orgName,
+        orgEmail: form.orgEmail,
+        phoneNumber: form.phoneNumber,
+        address: form.address,
+        location: {
+          country: form.country,
+          state: form.state,
+          city: form.city,
+          postalCode: form.postalCode,
+        },
+        requestedFeatures: selectedFeatures,
+      });
       setSuccess(response.message || "Organization registration submitted for superadmin review.");
       setForm(INITIAL_ORGANIZATION_REGISTRATION_FORM);
     } catch (error) {

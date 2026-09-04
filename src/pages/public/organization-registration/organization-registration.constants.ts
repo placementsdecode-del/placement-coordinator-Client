@@ -1,11 +1,14 @@
 import type { Feature } from "@/types/api";
 
 export const INITIAL_ORGANIZATION_REGISTRATION_FORM = {
-  id: "",
   orgName: "",
   orgEmail: "",
-  address: "",
   phoneNumber: "",
+  country: "India",
+  state: "",
+  city: "",
+  postalCode: "",
+  address: "",
 };
 
 export const FALLBACK_REGISTRATION_FEATURES: Feature[] = [

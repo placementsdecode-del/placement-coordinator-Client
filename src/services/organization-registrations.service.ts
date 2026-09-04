@@ -3,10 +3,15 @@ import { apiFetch } from "@/services/api-client";
 import type { RegisterOrg } from "@/types/api";
 
 export type OrganizationRegistrationPayload = {
-  id: string;
   orgName: string;
   orgEmail: string;
   address: string;
+  location: {
+    country: string;
+    state: string;
+    city: string;
+    postalCode: string;
+  };
   phoneNumber: string;
   requestedFeatures: string[];
 };

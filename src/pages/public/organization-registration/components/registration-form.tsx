@@ -31,10 +31,13 @@ export function RegistrationForm({
       <CardContent>
         <form className="grid gap-4" onSubmit={onSubmit}>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Input required placeholder="Organization ID" value={form.id} onChange={(event) => onUpdateField("id", event.target.value)} />
             <Input required placeholder="Organization name" value={form.orgName} onChange={(event) => onUpdateField("orgName", event.target.value)} />
             <Input required type="email" placeholder="Admin email" value={form.orgEmail} onChange={(event) => onUpdateField("orgEmail", event.target.value)} />
             <Input required placeholder="Phone number" value={form.phoneNumber} onChange={(event) => onUpdateField("phoneNumber", event.target.value)} />
+            <Input required placeholder="Country" value={form.country} onChange={(event) => onUpdateField("country", event.target.value)} />
+            <Input required placeholder="State" value={form.state} onChange={(event) => onUpdateField("state", event.target.value)} />
+            <Input required placeholder="City" value={form.city} onChange={(event) => onUpdateField("city", event.target.value)} />
+            <Input required placeholder="Postal code" value={form.postalCode} onChange={(event) => onUpdateField("postalCode", event.target.value)} />
           </div>
           <textarea
             required

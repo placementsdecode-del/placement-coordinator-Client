@@ -1,7 +1,10 @@
 export type OrganizationRegistrationFormValues = {
-  id: string;
   orgName: string;
   orgEmail: string;
-  address: string;
   phoneNumber: string;
+  country: string;
+  state: string;
+  city: string;
+  postalCode: string;
+  address: string;
 };

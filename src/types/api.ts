@@ -34,6 +34,12 @@ export type RegisterOrg = {
   orgName: string;
   orgEmail: string;
   address: string;
+  location?: {
+    country?: string;
+    state?: string;
+    city?: string;
+    postalCode?: string;
+  };
   phoneNumber: string;
   requestedFeatures: string[] | Feature[];
   status: "pending" | "accepted" | "rejected";
@@ -46,6 +52,12 @@ export type AcceptedOrganization = {
   orgName: string;
   orgEmail: string;
   address: string;
+  location?: {
+    country?: string;
+    state?: string;
+    city?: string;
+    postalCode?: string;
+  };
   phoneNumber: string;
   features: string[] | Feature[];
   adminUser?: string | ApiUser | null;
