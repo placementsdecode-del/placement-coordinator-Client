@@ -227,6 +227,7 @@ export function AdminSection({
         roleName: "student",
       });
       await refreshOrganizationUsers();
+      setSelectedStudentId(response.user.id || response.user._id || "");
       onAction(response.temporaryPassword ? `Student created. Temporary password: ${response.temporaryPassword}` : response.message || "Student created.");
     } catch (error) {
       onAction(error instanceof Error ? error.message : "Student creation failed.");
@@ -347,6 +348,7 @@ export function AdminSection({
         onSelectSection={setSelectedSectionId}
         onSelectStudent={setSelectedStudentId}
         onMoveStudent={moveStudent}
+        onCreateStudent={createStudent}
         loading={workLoading || usersLoading}
       />
     );
@@ -667,6 +669,10 @@ function StudentsAdmin({
   const [showCreate, setShowCreate] = useState(false);
   const filteredStudents = students.filter((student) => student.section === sectionFilter);
 
+  useEffect(() => {
+    setSectionFilter((current) => current || sections[0]?.name || "");
+  }, [sections]);
+
   return (
     <>
       <SectionIntro
@@ -727,9 +733,13 @@ function StudentsAdmin({
 
 function CreateStudentForm({
   sections,
+  initialSectionId,
+  embedded = false,
   onCreateStudent,
 }: {
   sections: SectionRow[];
+  initialSectionId?: string;
+  embedded?: boolean;
   onCreateStudent: (user: {
     name: string;
     email: string;
@@ -748,19 +758,23 @@ function CreateStudentForm({
     registrationNumber: "",
     department: sections[0]?.department ?? "",
     batch: sections[0]?.batch ?? "",
-    section: sections[0]?.id ?? "",
+    section: initialSectionId ?? sections[0]?.id ?? "",
     password: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Add Student</CardTitle>
-        <CardDescription>Create a student account and assign an initial section.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form
+  useEffect(() => {
+    const initialSection = sections.find((section) => section.id === initialSectionId);
+    setForm((current) => ({
+      ...current,
+      department: initialSection?.department || current.department || sections[0]?.department || "",
+      batch: initialSection?.batch || current.batch || sections[0]?.batch || "",
+      section: initialSectionId || current.section || sections[0]?.id || "",
+    }));
+  }, [initialSectionId, sections]);
+
+  const formContent = (
+    <form
           className="grid gap-3 md:grid-cols-4"
           onSubmit={async (event) => {
             event.preventDefault();
@@ -788,11 +802,35 @@ function CreateStudentForm({
             {sections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
           </select>
           <Input placeholder="Password optional" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} />
-          <Button className="md:col-span-4" type="submit" disabled={submitting}>
-            {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-            {submitting ? "Creating..." : "Create Student"}
-          </Button>
+          <div className="flex justify-end md:col-span-4">
+            <Button type="submit" disabled={submitting}>
+              {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+              {submitting ? "Creating..." : "Create Student"}
+            </Button>
+          </div>
         </form>
+  );
+
+  if (embedded) {
+    return (
+      <div className="rounded-lg border bg-background p-4">
+        <div className="mb-3">
+          <p className="font-semibold">Add Student To Section</p>
+          <p className="text-sm text-muted-foreground">Create a student account directly in the selected section.</p>
+        </div>
+        {formContent}
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Add Student</CardTitle>
+        <CardDescription>Create a student account and assign an initial section.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {formContent}
       </CardContent>
     </Card>
   );
@@ -807,6 +845,7 @@ function SectionsAdmin({
   onSelectSection,
   onSelectStudent,
   onMoveStudent,
+  onCreateStudent,
   loading,
 }: {
   sections: SectionRow[];
@@ -817,9 +856,20 @@ function SectionsAdmin({
   onSelectSection: (sectionId: string) => void;
   onSelectStudent: (studentId: string) => void;
   onMoveStudent: (studentId: string, sectionName: string) => Promise<void>;
+  onCreateStudent: (user: {
+    name: string;
+    email: string;
+    phoneNumber: string;
+    registrationNumber: string;
+    department: string;
+    batch: string;
+    section?: string;
+    password?: string;
+  }) => Promise<void>;
   loading: boolean;
 }) {
   const [showForm, setShowForm] = useState(false);
+  const [showStudentForm, setShowStudentForm] = useState(false);
   const sectionStudents = selectedSection ? students.filter((student) => student.section === selectedSection.name) : [];
 
   return (
@@ -876,6 +926,17 @@ function SectionsAdmin({
               <InfoTile label="Batch" value={selectedSection.batch} />
               <InfoTile label="Students" value={String(sectionStudents.length)} />
             </div> : null}
+            {selectedSection ? (
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={() => setShowStudentForm((value) => !value)}>
+                  <UserPlus className="h-4 w-4" />
+                  Add Student
+                </Button>
+              </div>
+            ) : null}
+            {showStudentForm && selectedSection ? (
+              <CreateStudentForm sections={sections} initialSectionId={selectedSection.id} embedded onCreateStudent={onCreateStudent} />
+            ) : null}
             {sectionStudents.length > 0 ? sectionStudents.map((student) => (
               <button
                 key={student.id}
@@ -953,10 +1014,12 @@ function CreateSectionForm({ onCreateSection }: { onCreateSection: (section: Sec
           <Input placeholder="Section code" value={code} onChange={(event) => setCode(event.target.value)} />
           <Input placeholder="Department" value={department} onChange={(event) => setDepartment(event.target.value)} />
           <Input placeholder="Batch" value={batch} onChange={(event) => setBatch(event.target.value)} />
-          <Button className="md:col-span-4" type="submit" disabled={submitting}>
-            {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            {submitting ? "Creating..." : "Create Section"}
-          </Button>
+          <div className="flex justify-end md:col-span-4">
+            <Button type="submit" disabled={submitting}>
+              {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {submitting ? "Creating..." : "Create Section"}
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>
@@ -1096,7 +1159,6 @@ function CoordinatorsAdmin({
             <Input placeholder="Role name" value={roleName} onChange={(event) => setRoleName(event.target.value)} />
             <textarea className="min-h-24 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={permissions} onChange={(event) => setPermissions(event.target.value)} />
             <Button
-              className="w-full"
               onClick={() => {
                 onAddRole({
                   id: crypto.randomUUID(),
@@ -1223,9 +1285,11 @@ function TasksAdmin({ tasks, sections, onAddTask }: { tasks: AdminTask[]; sectio
               </select>
             </div>
             <textarea className="min-h-28 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" placeholder="Instructions, attachments, expected outcome, evaluation notes" />
-            <Button className="w-full" onClick={() => onAddTask({ id: crypto.randomUUID(), title: previewTitle, type, assignedTo, due: "Tomorrow, 5:00 PM", status: "Draft", submissions: 0 })}>
-              Create Task
-            </Button>
+            <div className="flex justify-end">
+              <Button onClick={() => onAddTask({ id: crypto.randomUUID(), title: previewTitle, type, assignedTo, due: "Tomorrow, 5:00 PM", status: "Draft", submissions: 0 })}>
+                Create Task
+              </Button>
+            </div>
           </CardContent>
         </Card>
         <StudentTaskPreview title={previewTitle} type={type} assignedTo={assignedTo} />
@@ -1270,7 +1334,9 @@ function StudentTaskPreview({ title, type, assignedTo }: { title: string; type: 
         <div className="rounded-lg border p-3 text-sm text-muted-foreground">
           Students will see instructions, attachments, comments, upload controls, and coordinator feedback after review.
         </div>
-        <Button className="w-full" variant="outline">Open Student View Preview</Button>
+        <div className="flex justify-end">
+          <Button variant="outline">Open Student View Preview</Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -1374,7 +1440,7 @@ function AssessmentsAdmin({
               {questionType === "MCQ" ? (
                 <Input className="mt-3" placeholder="Comma-separated options" value={questionOptions} onChange={(event) => setQuestionOptions(event.target.value)} />
               ) : null}
-              <Button className="mt-3 w-full" variant="outline" onClick={addQuestion}>
+              <Button className="mt-3" variant="outline" onClick={addQuestion}>
                 <Plus className="h-4 w-4" />
                 Add Question
               </Button>
@@ -1392,7 +1458,6 @@ function AssessmentsAdmin({
               </div>
             </div>
             <Button
-              className="w-full"
               disabled={submitting || !title.trim() || !assignedTo || !instructions.trim() || !questions.length}
               onClick={async () => {
                 const assessment = { id: crypto.randomUUID(), title: previewTitle, type, assignedTo, duration: "60 min", instructions, rubric, status: `Draft · ${questions.length} ${questions.length === 1 ? "question" : "questions"}`, questions };
@@ -1763,9 +1828,11 @@ function SettingsAdmin({ onAction }: { onAction: (message: string) => void }) {
                 </Button>
               </div>
             </div>
-            <Button className="w-full" onClick={() => onAction("Organization profile saved and applied as student defaults.")}>
-              Save Organization Defaults
-            </Button>
+            <div className="flex justify-end">
+              <Button onClick={() => onAction("Organization profile saved and applied as student defaults.")}>
+                Save Organization Defaults
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -1806,7 +1873,7 @@ function InfoTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border bg-background p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-semibold">{value}</p>
+      <p className="break-words font-semibold">{value}</p>
     </div>
   );
 }

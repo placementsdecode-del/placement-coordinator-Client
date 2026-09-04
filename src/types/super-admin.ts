@@ -33,10 +33,17 @@ export type OrganizationRequest = {
   id: string;
   name: string;
   contact: string;
+  phoneNumber?: string;
+  address?: string;
+  country?: string;
+  state?: string;
+  city?: string;
+  postalCode?: string;
   featureIds?: string[];
   requestedPlan: string;
   status: string;
   submitted: string;
+  notes?: string;
 };
 
 export type PlatformUser = {

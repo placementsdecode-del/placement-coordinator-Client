@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, Check, ChevronDown, ChevronRight, CreditCard, FileText, GitCommitHorizontal, LifeBuoy, LoaderCircle, Plus, Settings, ShieldCheck, Users, X } from "lucide-react";
+import { ArrowLeft, BarChart3, Building2, Check, ChevronDown, ChevronRight, CreditCard, FileText, GitCommitHorizontal, LifeBuoy, LoaderCircle, Mail, MapPin, Phone, Plus, Settings, ShieldCheck, Users, X, type LucideIcon } from "lucide-react";
 import { ChangePasswordCard } from "@/components/common/change-password-card";
 import { DonutProgress } from "@/components/common/donut-progress";
 import { EmptyState } from "@/components/common/empty-state";
@@ -150,10 +150,17 @@ function mapRegistration(registration: RegisterOrg): OrganizationRequest {
     id: registration._id,
     name: registration.orgName,
     contact: registration.orgEmail,
+    phoneNumber: registration.phoneNumber,
+    address: registration.address,
+    country: registration.location?.country,
+    state: registration.location?.state,
+    city: registration.location?.city,
+    postalCode: registration.location?.postalCode,
     featureIds: registration.requestedFeatures.map((feature) => (typeof feature === "string" ? feature : feature._id)),
     requestedPlan: featureNames(registration.requestedFeatures),
     status: registration.status === "pending" ? "New" : registration.status,
     submitted: registration.externalId ?? "Submitted",
+    notes: registration.discussionNotes,
   };
 }
 
@@ -374,16 +381,16 @@ function OrganizationsPage({
             {loading ? <SkeletonRows rows={4} /> : organizations.map((org) => (
               <button
                 key={org.id}
-                className={`grid w-full gap-3 rounded-lg border p-3 text-left md:grid-cols-[minmax(0,1fr)_110px_120px] md:items-center ${
+                className={`grid w-full gap-3 rounded-lg border p-3 text-left md:grid-cols-[minmax(0,1fr)_120px] md:items-center ${
                   selectedOrg?.id === org.id ? "border-primary bg-primary/5" : "bg-white"
                 }`}
                 onClick={() => onSelectOrg(org.id)}
               >
-                <div>
+                <div className="min-w-0">
                   <p className="font-semibold">{org.name}</p>
                   <p className="text-sm text-muted-foreground">{org.students} students · {org.coordinators} coordinators · {org.region}</p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">{org.plan}</p>
                 </div>
-                <Badge variant="outline">{org.plan}</Badge>
                 <Badge variant={org.status === "Active" ? "secondary" : org.status === "Suspended" ? "danger" : "warning"}>{org.status}</Badge>
               </button>
             ))}
@@ -460,6 +467,12 @@ function RequestsPage({
   onHandleRequest: (requestId: string, status: string) => Promise<void>;
 }) {
   const [busyRequest, setBusyRequest] = useState("");
+  const [selectedRequestId, setSelectedRequestId] = useState(requests[0]?.id ?? "");
+  const selectedRequest = requests.find((request) => request.id === selectedRequestId) ?? requests[0] ?? null;
+
+  useEffect(() => {
+    setSelectedRequestId((current) => requests.find((request) => request.id === current)?.id ?? requests[0]?.id ?? "");
+  }, [requests]);
 
   async function handleRequestAction(requestId: string, status: string) {
     setBusyRequest(`${requestId}:${status}`);
@@ -478,34 +491,96 @@ function RequestsPage({
         description="Approve valid institutions, reject incomplete requests, or mark them for review."
       />
       {loadError ? <ApiNotice message={loadError} /> : null}
-      <Card>
-        <CardContent className="space-y-3 p-4 sm:p-5">
-          {loading ? <SkeletonRows rows={4} /> : requests.map((request) => (
-            <div key={request.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_130px_220px] md:items-center">
-              <div>
-                <p className="font-semibold">{request.name}</p>
-                <p className="text-sm text-muted-foreground">{request.contact} · {request.submitted}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Requested: {request.requestedPlan || "Standard setup"}</p>
-              </div>
-              <Badge variant="outline">{request.status}</Badge>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button variant="outline" size="sm" disabled={Boolean(busyRequest)} onClick={() => handleRequestAction(request.id, "Approved")}>
-                  {busyRequest === `${request.id}:Approved` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                  {busyRequest === `${request.id}:Approved` ? "Approving..." : "Approve"}
-                </Button>
-                <Button variant="outline" size="sm" disabled={Boolean(busyRequest)} onClick={() => handleRequestAction(request.id, "Rejected")}>
-                  {busyRequest === `${request.id}:Rejected` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
-                  {busyRequest === `${request.id}:Rejected` ? "Rejecting..." : "Reject"}
-                </Button>
-              </div>
-            </div>
-          ))}
-          {!loading && !requests.length ? (
-            <EmptyState icon={ShieldCheck} title="No organization requests" description="New organization registrations will appear here for approval or rejection." />
-          ) : null}
-        </CardContent>
-      </Card>
+      <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Registration Queue</CardTitle>
+            <CardDescription>Select a request to inspect full organization details.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {loading ? <SkeletonRows rows={4} /> : requests.map((request) => (
+              <button
+                key={request.id}
+                className={`grid w-full gap-3 rounded-lg border p-3 text-left md:grid-cols-[minmax(0,1fr)_130px] md:items-center ${
+                  selectedRequest?.id === request.id ? "border-primary bg-primary/5" : "bg-white"
+                }`}
+                onClick={() => setSelectedRequestId(request.id)}
+              >
+                <div className="min-w-0">
+                  <p className="font-semibold">{request.name}</p>
+                  <p className="text-sm text-muted-foreground">{request.contact} · {request.submitted}</p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">Requested: {request.requestedPlan || "Standard setup"}</p>
+                </div>
+                <Badge variant="outline">{request.status}</Badge>
+              </button>
+            ))}
+            {!loading && !requests.length ? (
+              <EmptyState icon={ShieldCheck} title="No organization requests" description="New organization registrations will appear here for approval or rejection." />
+            ) : null}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>{selectedRequest?.name ?? "No request selected"}</CardTitle>
+            <CardDescription>Review all submitted details before making a decision.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {loading ? <SkeletonRows rows={5} /> : selectedRequest ? (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <RequestDetail icon={Building2} label="Organization" value={selectedRequest.name} />
+                  <RequestDetail icon={Mail} label="Email" value={selectedRequest.contact} />
+                  <RequestDetail icon={Phone} label="Phone" value={selectedRequest.phoneNumber || "Not provided"} />
+                  <RequestDetail icon={MapPin} label="Location" value={[selectedRequest.city, selectedRequest.state, selectedRequest.country, selectedRequest.postalCode].filter(Boolean).join(", ") || "Not provided"} />
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs font-medium text-muted-foreground">Address</p>
+                  <p className="mt-1 text-sm font-semibold">{selectedRequest.address || "Not provided"}</p>
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs font-medium text-muted-foreground">Requested Features</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(selectedRequest.requestedPlan ? selectedRequest.requestedPlan.split(",").map((item) => item.trim()).filter(Boolean) : ["Standard setup"]).map((feature) => (
+                      <Badge key={feature} variant="outline">{feature}</Badge>
+                    ))}
+                  </div>
+                </div>
+                {selectedRequest.notes ? (
+                  <div className="rounded-lg border bg-background p-3">
+                    <p className="text-xs font-medium text-muted-foreground">Notes</p>
+                    <p className="mt-1 text-sm">{selectedRequest.notes}</p>
+                  </div>
+                ) : null}
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button variant="outline" disabled={Boolean(busyRequest)} onClick={() => handleRequestAction(selectedRequest.id, "Rejected")}>
+                    {busyRequest === `${selectedRequest.id}:Rejected` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                    {busyRequest === `${selectedRequest.id}:Rejected` ? "Rejecting..." : "Reject"}
+                  </Button>
+                  <Button disabled={Boolean(busyRequest)} onClick={() => handleRequestAction(selectedRequest.id, "Approved")}>
+                    {busyRequest === `${selectedRequest.id}:Approved` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                    {busyRequest === `${selectedRequest.id}:Approved` ? "Approving..." : "Approve"}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <EmptyState icon={ShieldCheck} title="No request selected" description="Select a registration request to review its details." />
+            )}
+          </CardContent>
+        </Card>
+      </section>
     </>
+  );
+}
+
+function RequestDetail({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+  return (
+    <div className="rounded-lg border bg-background p-3">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <Icon className="h-4 w-4" />
+        {label}
+      </div>
+      <p className="mt-2 break-words text-sm font-semibold">{value}</p>
+    </div>
   );
 }
 
@@ -611,10 +686,12 @@ function UsersPage({
               <option value="student">Student</option>
             </select>
             <Input placeholder="Password optional" value={password} onChange={(event) => setPassword(event.target.value)} />
-            <Button className="md:col-span-5" type="submit" disabled={creating}>
-              {creating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              {creating ? "Creating..." : "Create User"}
-            </Button>
+            <div className="flex justify-end md:col-span-5">
+              <Button type="submit" disabled={creating}>
+                {creating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {creating ? "Creating..." : "Create User"}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
@@ -725,10 +802,12 @@ function FeaturesPage({
               />
               Default
             </label>
-            <Button className="md:col-span-4" type="submit" disabled={creating}>
-              {creating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              {creating ? "Creating..." : "Create Feature"}
-            </Button>
+            <div className="flex justify-end md:col-span-4">
+              <Button type="submit" disabled={creating}>
+                {creating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {creating ? "Creating..." : "Create Feature"}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
@@ -911,7 +990,7 @@ function PlansPage({ onAction }: { onAction: (message: string) => void }) {
             <CardContent className="space-y-3">
               <p className="text-3xl font-bold">{index === 0 ? "₹9k" : index === 1 ? "₹29k" : "Custom"}</p>
               <Badge variant="outline">{index === 2 ? "Unlimited users" : `${index === 0 ? 500 : 2500} students`}</Badge>
-              <Button className="w-full" variant="outline">Edit Plan</Button>
+              <Button variant="outline">Edit Plan</Button>
             </CardContent>
           </Card>
         ))}
@@ -1244,7 +1323,7 @@ function InfoTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border bg-background p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-semibold">{value}</p>
+      <p className="break-words font-semibold">{value}</p>
     </div>
   );
 }

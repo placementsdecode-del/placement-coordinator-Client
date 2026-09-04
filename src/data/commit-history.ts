@@ -4,6 +4,30 @@ import type { CommitEntry } from "@/types/super-admin";
 // `files` is capped at the top 12 changed files per commit; `filesChanged` is the true total.
 export const commitHistory: CommitEntry[] = [
   {
+    hash: "2c512fe",
+    author: "naveed-devz",
+    date: "2026-09-05",
+    message: "fixed UI loadin issues",
+    area: "Platform",
+    body: "",
+    filesChanged: 11,
+    insertions: 554,
+    deletions: 236,
+    files: [
+        { path: "src/sections/admin/admin-section.tsx", added: 242, removed: 121, patch: "", patchTruncated: false },
+        { path: "src/sections/super-admin/super-admin-section.tsx", added: 200, removed: 76, patch: "", patchTruncated: false },
+        { path: "src/index.css", added: 15, removed: 18, patch: "", patchTruncated: false },
+        { path: "src/components/common/empty-state.tsx", added: 26, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/data/commit-history.ts", added: 25, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/components/common/loading-state.tsx", added: 24, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/components/ui/button.tsx", added: 9, removed: 8, patch: "", patchTruncated: false },
+        { path: "src/components/ui/badge.tsx", added: 6, removed: 6, patch: "", patchTruncated: false },
+        { path: "src/components/common/section-intro.tsx", added: 3, removed: 3, patch: "", patchTruncated: false },
+        { path: "src/components/ui/card.tsx", added: 3, removed: 3, patch: "", patchTruncated: false },
+        { path: "src/components/ui/input.tsx", added: 1, removed: 1, patch: "", patchTruncated: false },
+    ],
+  },
+  {
     hash: "e2e2199",
     author: "naveed-devz",
     date: "2026-09-04",
