@@ -4,6 +4,31 @@ import type { CommitEntry } from "@/types/super-admin";
 // `files` is capped at the top 12 changed files per commit; `filesChanged` is the true total.
 export const commitHistory: CommitEntry[] = [
   {
+    hash: "e2e2199",
+    author: "naveed-devz",
+    date: "2026-09-04",
+    message: "Remove hardcoded operational demo data",
+    area: "Platform",
+    body: "",
+    filesChanged: 18,
+    insertions: 278,
+    deletions: 751,
+    files: [
+        { path: "src/data/student.ts", added: 17, removed: 259, patch: "", patchTruncated: false },
+        { path: "src/data/admin.ts", added: 7, removed: 171, patch: "", patchTruncated: false },
+        { path: "src/sections/admin/admin-section.tsx", added: 82, removed: 72, patch: "", patchTruncated: false },
+        { path: "src/data/super-admin.ts", added: 19, removed: 39, patch: "", patchTruncated: false },
+        { path: "src/sections/super-admin/super-admin-section.tsx", added: 36, removed: 22, patch: "", patchTruncated: false },
+        { path: "src/sections/coding-practice/coding-practice-section.tsx", added: 20, removed: 37, patch: "", patchTruncated: false },
+        { path: "src/sections/results/results-section.tsx", added: 7, removed: 45, patch: "", patchTruncated: false },
+        { path: "src/sections/profile/profile-section.tsx", added: 11, removed: 38, patch: "", patchTruncated: false },
+        { path: "src/sections/dashboard/dashboard-section.tsx", added: 9, removed: 33, patch: "", patchTruncated: false },
+        { path: "src/components/common/analytics-leaderboard.tsx", added: 18, removed: 7, patch: "", patchTruncated: false },
+        { path: "src/sections/self-assessment/self-assessment-section.tsx", added: 9, removed: 16, patch: "", patchTruncated: false },
+        { path: "src/data/commit-history.ts", added: 21, removed: 0, patch: "", patchTruncated: false },
+    ],
+  },
+  {
     hash: "db18977",
     author: "naveed-devz",
     date: "2026-09-04",

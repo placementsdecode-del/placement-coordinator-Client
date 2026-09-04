@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, Check, ChevronDown, ChevronRight, CreditCard, FileText, GitCommitHorizontal, LifeBuoy, LoaderCircle, Plus, Settings, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, BarChart3, Check, ChevronDown, ChevronRight, CreditCard, FileText, GitCommitHorizontal, LifeBuoy, LoaderCircle, Plus, Settings, ShieldCheck, Users, X } from "lucide-react";
 import { ChangePasswordCard } from "@/components/common/change-password-card";
 import { DonutProgress } from "@/components/common/donut-progress";
+import { EmptyState } from "@/components/common/empty-state";
+import { SkeletonRows } from "@/components/common/loading-state";
 import { SectionIntro } from "@/components/common/section-intro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { auditLogs, organizationRequests, organizations, platformMetrics, platformUsers, supportTickets } from "@/data/super-admin";
+import { auditLogs, organizationRequests, organizations, supportTickets } from "@/data/super-admin";
 import { cn } from "@/lib/utils";
 import { createFeature as createFeatureRecord, listFeatures, updateFeature } from "@/services/features.service";
 import {
@@ -29,12 +31,14 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
   const [features, setFeatures] = useState<Feature[]>([]);
   const [roles, setRoles] = useState<ApiRole[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [platformLoading, setPlatformLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [selectedOrgId, setSelectedOrgId] = useState(orgRows[0]?.id ?? "");
   const selectedOrg = orgRows.find((org) => org.id === selectedOrgId) ?? orgRows[0] ?? null;
 
   async function refreshPlatformData() {
     setLoadError("");
+    setPlatformLoading(true);
     try {
       const [registrations, acceptedOrganizations, users, featureRows, roleRows, permissionRows] = await Promise.all([
         listOrganizationRegistrations("pending"),
@@ -55,6 +59,8 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
       setSelectedOrgId((current) => mappedOrganizations.find((org) => org.id === current)?.id ?? mappedOrganizations[0]?.id ?? current);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Unable to load platform data.");
+    } finally {
+      setPlatformLoading(false);
     }
   }
 
@@ -110,23 +116,25 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
         onSelectOrg={setSelectedOrgId}
         onUpdateDetails={updateOrgDetails}
         onUpdateStatus={updateOrgStatus}
+        loading={platformLoading}
       />
     );
   }
-  if (activeNav === "Requests") return <RequestsPage requests={requests} loadError={loadError} onHandleRequest={handleRequest} />;
-  if (activeNav === "Users") return <UsersPage apiUsers={apiUsers} organizations={apiOrganizations} onUserChanged={refreshPlatformData} onAction={onAction} />;
+  if (activeNav === "Requests") return <RequestsPage requests={requests} loadError={loadError} loading={platformLoading} onHandleRequest={handleRequest} />;
+  if (activeNav === "Users") return <UsersPage apiUsers={apiUsers} organizations={apiOrganizations} loading={platformLoading} onUserChanged={refreshPlatformData} onAction={onAction} />;
   if (activeNav === "Settings") {
     return (
       <RolesSettingsPage
         organizations={apiOrganizations}
         permissions={permissions}
         roles={roles}
+        loading={platformLoading}
         onRoleChanged={refreshPlatformData}
         onAction={onAction}
       />
     );
   }
-  if (activeNav === "Features") return <FeaturesPage features={features} onFeatureChanged={refreshPlatformData} onAction={onAction} />;
+  if (activeNav === "Features") return <FeaturesPage features={features} loading={platformLoading} onFeatureChanged={refreshPlatformData} onAction={onAction} />;
   if (activeNav === "Plans") return <PlansPage onAction={onAction} />;
   if (activeNav === "Analytics") return <AnalyticsPage organizations={orgRows} />;
   if (activeNav === "Support") return <SupportPage onAction={onAction} />;
@@ -134,7 +142,7 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
   if (activeNav === "Changelog") return <ChangelogPage />;
   
 
-  return <SuperAdminDashboard organizations={orgRows} requests={requests} onAction={onAction} />;
+  return <SuperAdminDashboard organizations={orgRows} requests={requests} loading={platformLoading} loadError={loadError} onAction={onAction} />;
 }
 
 function mapRegistration(registration: RegisterOrg): OrganizationRequest {
@@ -174,12 +182,23 @@ function organizationLabel(organization: ApiUser["organization"]) {
 function SuperAdminDashboard({
   organizations,
   requests,
+  loading,
+  loadError,
   onAction,
 }: {
   organizations: OrganizationRow[];
   requests: OrganizationRequest[];
+  loading: boolean;
+  loadError: string;
   onAction: (message: string) => void;
 }) {
+  const metrics = [
+    { label: "Organizations", value: organizations.length, detail: "Accepted tenants" },
+    { label: "Pending requests", value: requests.length, detail: "Awaiting review" },
+    { label: "Active tenants", value: organizations.filter((org) => org.status === "Active").length, detail: "Currently active" },
+    { label: "Suspended tenants", value: organizations.filter((org) => org.status === "Suspended").length, detail: "Needs follow-up" },
+  ];
+
   return (
     <>
       <SectionIntro
@@ -193,10 +212,11 @@ function SuperAdminDashboard({
           </Button>
         }
       />
+      {loadError ? <ApiNotice message={loadError} /> : null}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {platformMetrics.map((metric) => (
+        {metrics.map((metric) => (
           <Card key={metric.label}>
-            <CardContent className="p-4">
+            <CardContent className="min-h-28 p-5">
               <p className="text-sm text-muted-foreground">{metric.label}</p>
               <p className="mt-2 text-3xl font-bold">{metric.value}</p>
               <p className="text-sm text-muted-foreground">{metric.detail}</p>
@@ -211,7 +231,7 @@ function SuperAdminDashboard({
             <CardDescription>{organizations.length} organizations tracked.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {organizations.map((org) => (
+            {loading ? <SkeletonRows rows={3} /> : organizations.length ? organizations.map((org) => (
               <div key={org.id} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -224,7 +244,9 @@ function SuperAdminDashboard({
                 </div>
                 <DonutProgress value={org.usage} size="sm" className="justify-self-start sm:justify-self-end" />
               </div>
-            ))}
+            )) : (
+              <EmptyState title="No organizations yet" description="Approved organizations will appear here after registration review." />
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -233,10 +255,10 @@ function SuperAdminDashboard({
             <CardDescription>Platform queues.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {[
+            {loading ? <SkeletonRows rows={4} /> : [
               { label: "Organization requests", value: requests.filter((request) => request.status !== "Approved").length, icon: ShieldCheck },
               { label: "Support tickets", value: supportTickets.length, icon: LifeBuoy },
-              { label: "Plans active", value: "4", icon: CreditCard },
+              { label: "Plans active", value: "0", icon: CreditCard },
               { label: "Audit events", value: auditLogs.length, icon: BarChart3 },
             ].map((item) => (
               <div key={item.label} className="flex items-center gap-3 rounded-lg border p-3">
@@ -261,6 +283,7 @@ function OrganizationsPage({
   apiOrganizations,
   selectedOrg,
   loadError,
+  loading,
   onSelectOrg,
   onUpdateDetails,
   onUpdateStatus,
@@ -269,6 +292,7 @@ function OrganizationsPage({
   apiOrganizations: AcceptedOrganization[];
   selectedOrg: OrganizationRow | null;
   loadError: string;
+  loading: boolean;
   onSelectOrg: (orgId: string) => void;
   onUpdateDetails: (orgId: string, payload: Partial<AcceptedOrganization>) => Promise<void>;
   onUpdateStatus: (orgId: string, status: string) => Promise<void>;
@@ -284,6 +308,8 @@ function OrganizationsPage({
     postalCode: selectedApiOrg?.location?.postalCode ?? "",
     address: selectedApiOrg?.address ?? selectedOrg?.region ?? "",
   });
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState("");
 
   useEffect(() => {
     setForm({
@@ -301,18 +327,33 @@ function OrganizationsPage({
   async function submitDetails(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedOrg) return;
-    await onUpdateDetails(selectedOrg.id, {
-      orgName: form.orgName,
-      orgEmail: form.orgEmail,
-      phoneNumber: form.phoneNumber,
-      address: form.address,
-      location: {
-        country: form.country,
-        state: form.state,
-        city: form.city,
-        postalCode: form.postalCode,
-      },
-    });
+    setSavingDetails(true);
+    try {
+      await onUpdateDetails(selectedOrg.id, {
+        orgName: form.orgName,
+        orgEmail: form.orgEmail,
+        phoneNumber: form.phoneNumber,
+        address: form.address,
+        location: {
+          country: form.country,
+          state: form.state,
+          city: form.city,
+          postalCode: form.postalCode,
+        },
+      });
+    } finally {
+      setSavingDetails(false);
+    }
+  }
+
+  async function submitStatus(status: string) {
+    if (!selectedOrg) return;
+    setUpdatingStatus(status);
+    try {
+      await onUpdateStatus(selectedOrg.id, status);
+    } finally {
+      setUpdatingStatus("");
+    }
   }
 
   return (
@@ -330,7 +371,7 @@ function OrganizationsPage({
             <CardDescription>Tenant status and subscription overview.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {organizations.map((org) => (
+            {loading ? <SkeletonRows rows={4} /> : organizations.map((org) => (
               <button
                 key={org.id}
                 className={`grid w-full gap-3 rounded-lg border p-3 text-left md:grid-cols-[minmax(0,1fr)_110px_120px] md:items-center ${
@@ -346,10 +387,8 @@ function OrganizationsPage({
                 <Badge variant={org.status === "Active" ? "secondary" : org.status === "Suspended" ? "danger" : "warning"}>{org.status}</Badge>
               </button>
             ))}
-            {!organizations.length ? (
-              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                No organizations available yet.
-              </div>
+            {!loading && !organizations.length ? (
+              <EmptyState title="No organizations yet" description="Approved organizations will appear here after registration review." />
             ) : null}
           </CardContent>
         </Card>
@@ -370,9 +409,7 @@ function OrganizationsPage({
                 <DonutProgress value={selectedOrg.usage} label="Usage" caption="Current tenant resource usage" />
               </>
             ) : (
-              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                Select an organization after one is approved.
-              </div>
+              <EmptyState icon={Users} title="No organization selected" description="Select an organization after one is approved." />
             )}
             <form className="grid gap-2" onSubmit={submitDetails}>
               <Input required placeholder="Organization name" value={form.orgName} onChange={(event) => setForm((current) => ({ ...current, orgName: event.target.value }))} />
@@ -389,11 +426,20 @@ function OrganizationsPage({
                 value={form.address}
                 onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
               />
-              <Button type="submit" variant="outline" disabled={!selectedOrg}>Update Details</Button>
+              <Button type="submit" variant="outline" disabled={!selectedOrg || savingDetails}>
+                {savingDetails ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+                {savingDetails ? "Updating..." : "Update Details"}
+              </Button>
             </form>
             <div className="grid gap-2 sm:grid-cols-2">
-              <Button variant="outline" disabled={!selectedOrg} onClick={() => selectedOrg && onUpdateStatus(selectedOrg.id, "Active")}>Activate</Button>
-              <Button variant="outline" disabled={!selectedOrg} onClick={() => selectedOrg && onUpdateStatus(selectedOrg.id, "Suspended")}>Suspend</Button>
+              <Button variant="outline" disabled={!selectedOrg || Boolean(updatingStatus)} onClick={() => submitStatus("Active")}>
+                {updatingStatus === "Active" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+                Activate
+              </Button>
+              <Button variant="outline" disabled={!selectedOrg || Boolean(updatingStatus)} onClick={() => submitStatus("Suspended")}>
+                {updatingStatus === "Suspended" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+                Suspend
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -405,12 +451,25 @@ function OrganizationsPage({
 function RequestsPage({
   requests,
   loadError,
+  loading,
   onHandleRequest,
 }: {
   requests: OrganizationRequest[];
   loadError: string;
-  onHandleRequest: (requestId: string, status: string) => void;
+  loading: boolean;
+  onHandleRequest: (requestId: string, status: string) => Promise<void>;
 }) {
+  const [busyRequest, setBusyRequest] = useState("");
+
+  async function handleRequestAction(requestId: string, status: string) {
+    setBusyRequest(`${requestId}:${status}`);
+    try {
+      await onHandleRequest(requestId, status);
+    } finally {
+      setBusyRequest("");
+    }
+  }
+
   return (
     <>
       <SectionIntro
@@ -421,7 +480,7 @@ function RequestsPage({
       {loadError ? <ApiNotice message={loadError} /> : null}
       <Card>
         <CardContent className="space-y-3 p-4 sm:p-5">
-          {requests.map((request) => (
+          {loading ? <SkeletonRows rows={4} /> : requests.map((request) => (
             <div key={request.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_130px_220px] md:items-center">
               <div>
                 <p className="font-semibold">{request.name}</p>
@@ -430,17 +489,20 @@ function RequestsPage({
               </div>
               <Badge variant="outline">{request.status}</Badge>
               <div className="grid gap-2 sm:grid-cols-2">
-                <Button variant="outline" size="sm" onClick={() => onHandleRequest(request.id, "Approved")}>
-                  <Check className="h-4 w-4" />
-                  Approve
+                <Button variant="outline" size="sm" disabled={Boolean(busyRequest)} onClick={() => handleRequestAction(request.id, "Approved")}>
+                  {busyRequest === `${request.id}:Approved` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  {busyRequest === `${request.id}:Approved` ? "Approving..." : "Approve"}
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => onHandleRequest(request.id, "Rejected")}>
-                  <X className="h-4 w-4" />
-                  Reject
+                <Button variant="outline" size="sm" disabled={Boolean(busyRequest)} onClick={() => handleRequestAction(request.id, "Rejected")}>
+                  {busyRequest === `${request.id}:Rejected` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                  {busyRequest === `${request.id}:Rejected` ? "Rejecting..." : "Reject"}
                 </Button>
               </div>
             </div>
           ))}
+          {!loading && !requests.length ? (
+            <EmptyState icon={ShieldCheck} title="No organization requests" description="New organization registrations will appear here for approval or rejection." />
+          ) : null}
         </CardContent>
       </Card>
     </>
@@ -450,11 +512,13 @@ function RequestsPage({
 function UsersPage({
   apiUsers,
   organizations,
+  loading,
   onUserChanged,
   onAction,
 }: {
   apiUsers: ApiUser[];
   organizations: AcceptedOrganization[];
+  loading: boolean;
   onUserChanged: () => Promise<void>;
   onAction: (message: string) => void;
 }) {
@@ -463,8 +527,10 @@ function UsersPage({
   const [organization, setOrganization] = useState(organizations[0]?._id ?? "");
   const [roleName, setRoleName] = useState("teacher");
   const [password, setPassword] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [updatingUserId, setUpdatingUserId] = useState("");
   const hasApiUsers = apiUsers.length > 0;
-  const users = hasApiUsers ? apiUsers : platformUsers;
+  const users = apiUsers;
 
   useEffect(() => {
     setOrganization((current) => current || organizations[0]?._id || "");
@@ -472,6 +538,7 @@ function UsersPage({
 
   async function createUser(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setCreating(true);
     try {
       const response = await createUserRecord({
         organization: organization.trim() || undefined,
@@ -487,26 +554,34 @@ function UsersPage({
       onAction(response.temporaryPassword ? `User created. Temporary password: ${response.temporaryPassword}` : response.message || "User created.");
     } catch (error) {
       onAction(error instanceof Error ? error.message : "User creation failed.");
+    } finally {
+      setCreating(false);
     }
   }
 
   async function changeUserRole(userId: string, nextRole: "admin" | "teacher" | "student") {
+    setUpdatingUserId(userId);
     try {
       await updateUser(userId, { roleName: nextRole });
       await onUserChanged();
       onAction("User role updated.");
     } catch (error) {
       onAction(error instanceof Error ? error.message : "Role assignment failed.");
+    } finally {
+      setUpdatingUserId("");
     }
   }
 
   async function toggleUserStatus(user: ApiUser) {
+    setUpdatingUserId(user.id);
     try {
       await updateUser(user.id, { status: user.status === "active" ? "inactive" : "active" });
       await onUserChanged();
       onAction("User status updated.");
     } catch (error) {
       onAction(error instanceof Error ? error.message : "User update failed.");
+    } finally {
+      setUpdatingUserId("");
     }
   }
 
@@ -526,44 +601,55 @@ function UsersPage({
           <form className="grid gap-3 md:grid-cols-5" onSubmit={createUser}>
             <Input required placeholder="Name" value={name} onChange={(event) => setName(event.target.value)} />
             <Input required type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} />
-            <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={organization} onChange={(event) => setOrganization(event.target.value)}>
+            <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={organization} onChange={(event) => setOrganization(event.target.value)}>
               <option value="">Select organization</option>
               {organizations.map((item) => <option key={item._id} value={item._id}>{item.orgName}</option>)}
             </select>
-            <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={roleName} onChange={(event) => setRoleName(event.target.value)}>
+            <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={roleName} onChange={(event) => setRoleName(event.target.value)}>
               <option value="admin">Admin</option>
               <option value="teacher">Teacher</option>
               <option value="student">Student</option>
             </select>
             <Input placeholder="Password optional" value={password} onChange={(event) => setPassword(event.target.value)} />
-            <Button className="md:col-span-5" type="submit">Create User</Button>
+            <Button className="md:col-span-5" type="submit" disabled={creating}>
+              {creating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {creating ? "Creating..." : "Create User"}
+            </Button>
           </form>
         </CardContent>
       </Card>
       <Card>
         <CardContent className="space-y-3 p-4 sm:p-5">
-          {users.map((user) => (
+          {loading ? <SkeletonRows rows={4} /> : users.map((user) => (
             <div key={user.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_150px_130px_150px] md:items-center">
               <div>
                 <p className="font-semibold">{user.name}</p>
                 <p className="text-sm text-muted-foreground">{user.email} · {organizationLabel(user.organization)}</p>
               </div>
-              <select
-                className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
-                value={user.role === "superadmin" || user.role === "Super Admin" ? "admin" : user.role}
-                disabled={!hasApiUsers || user.role === "superadmin" || user.role === "Super Admin"}
-                onChange={(event) => changeUserRole(user.id, event.target.value as "admin" | "teacher" | "student")}
-              >
-                <option value="admin">Admin</option>
-                <option value="teacher">Teacher</option>
-                <option value="student">Student</option>
-              </select>
-              <Badge variant={user.status === "active" || user.status === "Active" ? "secondary" : "warning"}>{user.status}</Badge>
-              <Button size="sm" variant="outline" disabled={!hasApiUsers || user.role === "superadmin" || user.role === "Super Admin"} onClick={() => toggleUserStatus(user as ApiUser)}>
-                {user.status === "active" ? "Deactivate" : "Activate"}
+              {user.role === "superadmin" ? (
+                <Badge variant="outline">Super Admin</Badge>
+              ) : (
+                <select
+                  className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
+                  value={user.role}
+                  disabled={!hasApiUsers || Boolean(updatingUserId)}
+                  onChange={(event) => changeUserRole(user.id, event.target.value as "admin" | "teacher" | "student")}
+                >
+                  <option value="admin">Admin</option>
+                  <option value="teacher">Teacher</option>
+                  <option value="student">Student</option>
+                </select>
+              )}
+              <Badge variant={user.status === "active" ? "secondary" : "warning"}>{user.status}</Badge>
+              <Button size="sm" variant="outline" disabled={!hasApiUsers || user.role === "superadmin" || Boolean(updatingUserId)} onClick={() => toggleUserStatus(user as ApiUser)}>
+                {updatingUserId === user.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+                {updatingUserId === user.id ? "Updating..." : user.status === "active" ? "Deactivate" : "Activate"}
               </Button>
             </div>
           ))}
+          {!loading && !users.length ? (
+            <EmptyState icon={Users} title="No users yet" description="Users created through organization approval or user creation will appear here." />
+          ) : null}
         </CardContent>
       </Card>
     </>
@@ -572,17 +658,22 @@ function UsersPage({
 
 function FeaturesPage({
   features,
+  loading,
   onFeatureChanged,
   onAction,
 }: {
   features: Feature[];
+  loading: boolean;
   onFeatureChanged: () => Promise<void>;
   onAction: (message: string) => void;
 }) {
   const [form, setForm] = useState({ key: "", name: "", description: "", enabledByDefault: false });
+  const [creating, setCreating] = useState(false);
+  const [toggling, setToggling] = useState("");
 
   async function createFeature(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setCreating(true);
     try {
       await createFeatureRecord(form);
       await onFeatureChanged();
@@ -590,16 +681,21 @@ function FeaturesPage({
       onAction("Feature created.");
     } catch (error) {
       onAction(error instanceof Error ? error.message : "Feature creation failed.");
+    } finally {
+      setCreating(false);
     }
   }
 
   async function toggleFeature(feature: Feature, field: "enabledByDefault" | "isActive") {
+    setToggling(`${feature._id}:${field}`);
     try {
       await updateFeature(feature._id, { ...feature, [field]: !feature[field] });
       await onFeatureChanged();
       onAction("Feature updated.");
     } catch (error) {
       onAction(error instanceof Error ? error.message : "Feature update failed.");
+    } finally {
+      setToggling("");
     }
   }
 
@@ -620,22 +716,25 @@ function FeaturesPage({
             <Input required placeholder="key" value={form.key} onChange={(event) => setForm((current) => ({ ...current, key: event.target.value }))} />
             <Input required placeholder="Name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
             <Input required placeholder="Description" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
-            <label className="flex h-10 items-center gap-2 text-sm text-muted-foreground">
+            <label className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground">
               <input
-                className="h-4 w-4 accent-primary"
+                className="h-5 w-5 accent-primary"
                 type="checkbox"
                 checked={form.enabledByDefault}
                 onChange={(event) => setForm((current) => ({ ...current, enabledByDefault: event.target.checked }))}
               />
               Default
             </label>
-            <Button className="md:col-span-4" type="submit">Create Feature</Button>
+            <Button className="md:col-span-4" type="submit" disabled={creating}>
+              {creating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              {creating ? "Creating..." : "Create Feature"}
+            </Button>
           </form>
         </CardContent>
       </Card>
       <Card>
         <CardContent className="space-y-3 p-4 sm:p-5">
-          {features.length ? features.map((feature) => (
+          {loading ? <SkeletonRows rows={4} /> : features.length ? features.map((feature) => (
             <div key={feature._id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_130px_120px_190px] md:items-center">
               <div>
                 <p className="font-semibold">{feature.name}</p>
@@ -644,14 +743,18 @@ function FeaturesPage({
               <Badge variant={feature.enabledByDefault ? "secondary" : "outline"}>{feature.enabledByDefault ? "Default" : "Optional"}</Badge>
               <Badge variant={feature.isActive ? "secondary" : "warning"}>{feature.isActive ? "Active" : "Inactive"}</Badge>
               <div className="grid gap-2 sm:grid-cols-2">
-                <Button size="sm" variant="outline" onClick={() => toggleFeature(feature, "enabledByDefault")}>Default</Button>
-                <Button size="sm" variant="outline" onClick={() => toggleFeature(feature, "isActive")}>Active</Button>
+                <Button size="sm" variant="outline" disabled={Boolean(toggling)} onClick={() => toggleFeature(feature, "enabledByDefault")}>
+                  {toggling === `${feature._id}:enabledByDefault` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+                  Default
+                </Button>
+                <Button size="sm" variant="outline" disabled={Boolean(toggling)} onClick={() => toggleFeature(feature, "isActive")}>
+                  {toggling === `${feature._id}:isActive` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+                  Active
+                </Button>
               </div>
             </div>
           )) : (
-            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Connect the API to load feature rows.
-            </div>
+            <EmptyState icon={Settings} title="No features available" description="Feature rows will appear here after the API returns platform modules." />
           )}
         </CardContent>
       </Card>
@@ -671,16 +774,20 @@ function RolesSettingsPage({
   organizations,
   permissions,
   roles,
+  loading,
   onRoleChanged,
   onAction,
 }: {
   organizations: AcceptedOrganization[];
   permissions: string[];
   roles: ApiRole[];
+  loading: boolean;
   onRoleChanged: () => Promise<void>;
   onAction: (message: string) => void;
 }) {
   const [organizationId, setOrganizationId] = useState(organizations[0]?._id ?? "");
+  const [syncing, setSyncing] = useState(false);
+  const [savingRoleId, setSavingRoleId] = useState("");
   const visibleRoles = roles.filter((role) => !organizationId || role.organization === organizationId || (typeof role.organization === "object" && role.organization?._id === organizationId));
 
   useEffect(() => {
@@ -693,22 +800,28 @@ function RolesSettingsPage({
       return;
     }
 
+    setSyncing(true);
     try {
       await syncOrganizationRoles(organizationId);
       await onRoleChanged();
       onAction("Organization roles are ready.");
     } catch (error) {
       onAction(error instanceof Error ? error.message : "Role sync failed.");
+    } finally {
+      setSyncing(false);
     }
   }
 
   async function saveRole(role: ApiRole, nextPermissions: string[]) {
+    setSavingRoleId(role._id);
     try {
       await updateRole(role._id, { permissions: nextPermissions });
       await onRoleChanged();
       onAction("Role permissions updated.");
     } catch (error) {
       onAction(error instanceof Error ? error.message : "Role update failed.");
+    } finally {
+      setSavingRoleId("");
     }
   }
 
@@ -718,7 +831,12 @@ function RolesSettingsPage({
         eyebrow="Roles"
         title="Create organization roles and update permissions."
         description="Sync default organization roles, then assign permissions and use the Users page to assign roles to people."
-        action={<Button onClick={syncRoles}><ShieldCheck className="h-4 w-4" />Sync Roles</Button>}
+        action={
+          <Button onClick={syncRoles} disabled={syncing}>
+            {syncing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+            {syncing ? "Syncing..." : "Sync Roles"}
+          </Button>
+        }
       />
       <Card>
         <CardHeader>
@@ -726,14 +844,14 @@ function RolesSettingsPage({
           <CardDescription>Choose the tenant whose roles you want to manage.</CardDescription>
         </CardHeader>
         <CardContent>
-          <select className="h-10 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}>
+          <select className="h-11 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}>
             <option value="">All roles</option>
             {organizations.map((organization) => <option key={organization._id} value={organization._id}>{organization.orgName}</option>)}
           </select>
         </CardContent>
       </Card>
       <section className="grid gap-4 lg:grid-cols-3">
-        {visibleRoles.map((role) => (
+        {loading ? <SkeletonRows rows={4} className="lg:col-span-3" /> : visibleRoles.map((role) => (
           <Card key={role._id}>
             <CardHeader>
               <CardTitle>{role.displayName}</CardTitle>
@@ -743,11 +861,11 @@ function RolesSettingsPage({
               <p className="text-sm text-muted-foreground">{role.description}</p>
               <div className="space-y-2">
                 {permissions.map((permission) => (
-                  <label key={permission} className="flex items-center gap-2 text-sm">
+                  <label key={permission} className="flex min-h-11 items-center gap-2 text-sm">
                     <input
-                      className="h-4 w-4 accent-primary"
+                      className="h-5 w-5 accent-primary"
                       type="checkbox"
-                      disabled={!role.isEditable}
+                      disabled={!role.isEditable || Boolean(savingRoleId)}
                       checked={role.permissions.includes(permission)}
                       onChange={(event) => {
                         const nextPermissions = event.target.checked
@@ -760,9 +878,15 @@ function RolesSettingsPage({
                   </label>
                 ))}
               </div>
+              {savingRoleId === role._id ? <p className="text-xs text-muted-foreground">Saving permissions...</p> : null}
             </CardContent>
           </Card>
         ))}
+        {!loading && !visibleRoles.length ? (
+          <div className="lg:col-span-3">
+            <EmptyState icon={ShieldCheck} title="No roles available" description="Select an organization and sync roles to manage permissions." />
+          </div>
+        ) : null}
       </section>
     </>
   );

@@ -4,6 +4,8 @@ import {
   ClipboardList,
   Eye,
   FileText,
+  Layers,
+  LoaderCircle,
   Plus,
   Send,
   ShieldCheck,
@@ -12,6 +14,8 @@ import {
 } from "lucide-react";
 import { ChangePasswordCard } from "@/components/common/change-password-card";
 import { DonutProgress } from "@/components/common/donut-progress";
+import { EmptyState } from "@/components/common/empty-state";
+import { SkeletonRows } from "@/components/common/loading-state";
 import { SectionIntro } from "@/components/common/section-intro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +24,6 @@ import { Input } from "@/components/ui/input";
 import {
   adminAssessments,
   adminCoordinators,
-  adminMetrics,
   adminSections,
   adminStudents,
   adminTasks,
@@ -62,6 +65,9 @@ export function AdminSection({
   const [assessments, setAssessments] = useState<AdminAssessment[]>(adminAssessments);
   const [apiSections, setApiSections] = useState<ApiSection[]>([]);
   const [apiAssessments, setApiAssessments] = useState<ApiAssessment[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [workLoading, setWorkLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [selectedSectionId, setSelectedSectionId] = useState(sections[2]?.id ?? sections[0]?.id);
   const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id ?? "");
 
@@ -70,6 +76,7 @@ export function AdminSection({
 
   const refreshOrganizationUsers = useCallback(async () => {
     const organizationId = getOrganizationId(currentUser?.organization);
+    setUsersLoading(true);
     try {
       const [users, roleRows, permissionRows] = await Promise.all([
         listUsers(organizationId),
@@ -78,13 +85,18 @@ export function AdminSection({
       ]);
       setOrganizationUsers(users);
       const studentRows = users.filter((user) => user.role === "student").map(mapStudentUser);
-      if (studentRows.length) setStudents(studentRows);
+      setStudents(studentRows);
       setApiRoles(roleRows);
       setApiPermissions(permissionRows);
+      setLoadError("");
     } catch {
       setOrganizationUsers([]);
+      setStudents([]);
       setApiRoles([]);
       setApiPermissions([]);
+      setLoadError("Unable to load organization users.");
+    } finally {
+      setUsersLoading(false);
     }
   }, [currentUser?.organization]);
 
@@ -94,20 +106,30 @@ export function AdminSection({
 
   const refreshOrganizationWork = useCallback(async () => {
     const organizationId = getOrganizationId(currentUser?.organization);
-    if (!organizationId) return;
+    if (!organizationId) {
+      setWorkLoading(false);
+      return;
+    }
 
+    setWorkLoading(true);
     try {
       const [sectionRows, assessmentRows] = await Promise.all([
         listSections(organizationId),
         listAssessments(organizationId),
       ]);
       setApiSections(sectionRows);
-      if (sectionRows.length) setSections(sectionRows.map(mapSection));
+      setSections(sectionRows.map(mapSection));
       setApiAssessments(assessmentRows);
-      if (assessmentRows.length) setAssessments(assessmentRows.map(mapAssessment));
+      setAssessments(assessmentRows.map(mapAssessment));
+      setLoadError("");
     } catch {
       setApiSections([]);
+      setSections([]);
       setApiAssessments([]);
+      setAssessments([]);
+      setLoadError("Unable to load sections or assessments.");
+    } finally {
+      setWorkLoading(false);
     }
   }, [currentUser?.organization]);
 
@@ -309,6 +331,7 @@ export function AdminSection({
         onSelectStudent={setSelectedStudentId}
         onCreateStudent={createStudent}
         onMoveStudent={moveStudent}
+        loading={usersLoading}
       />
     );
   }
@@ -324,6 +347,7 @@ export function AdminSection({
         onSelectSection={setSelectedSectionId}
         onSelectStudent={setSelectedStudentId}
         onMoveStudent={moveStudent}
+        loading={workLoading || usersLoading}
       />
     );
   }
@@ -342,6 +366,7 @@ export function AdminSection({
         onCreateOrganizationUser={createOrganizationUser}
         onSyncRoles={syncRoles}
         onUpdateApiRolePermissions={updateApiRolePermissions}
+        loading={usersLoading}
       />
     );
   }
@@ -351,7 +376,7 @@ export function AdminSection({
   }
 
   if (activeNav === "Assessments") {
-    return <AssessmentsAdmin assessments={assessments} sections={sections} onAddAssessment={addAssessment} onCreateValidatedAssessment={createValidatedAssessment} />;
+    return <AssessmentsAdmin assessments={assessments} sections={sections} onAddAssessment={addAssessment} onCreateValidatedAssessment={createValidatedAssessment} loading={workLoading} />;
   }
 
   if (activeNav === "Announcements") return <AnnouncementsAdmin onAction={onAction} sections={sections} />;
@@ -359,12 +384,20 @@ export function AdminSection({
   if (activeNav === "Settings") return <SettingsAdmin onAction={onAction} />;
   if (activeNav === "Groups") return <GroupsAdmin onAction={onAction} />;
 
-  return <AdminDashboard sections={sections} students={students} coordinators={coordinators} tasks={tasks} assessments={assessments} onAction={onAction} />;
+  return <AdminDashboard sections={sections} students={students} coordinators={coordinators} tasks={tasks} assessments={assessments} loading={usersLoading || workLoading} loadError={loadError} onAction={onAction} />;
 }
 
 function getOrganizationId(organization: SessionUser["organization"] | undefined) {
   if (!organization) return undefined;
   return typeof organization === "string" ? organization : organization._id;
+}
+
+function ApiNotice({ message }: { message: string }) {
+  return (
+    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+      API data unavailable: {message}
+    </div>
+  );
 }
 
 function mapSection(section: ApiSection): SectionRow {
@@ -424,6 +457,8 @@ function AdminDashboard({
   coordinators,
   tasks,
   assessments,
+  loading,
+  loadError,
   onAction,
 }: {
   sections: SectionRow[];
@@ -431,8 +466,17 @@ function AdminDashboard({
   coordinators: CoordinatorRow[];
   tasks: AdminTask[];
   assessments: AdminAssessment[];
+  loading: boolean;
+  loadError: string;
   onAction: (message: string) => void;
 }) {
+  const metrics = [
+    { label: "Total students", value: students.length, detail: "Created from API data", tone: "bg-primary/10 text-primary" },
+    { label: "Coordinators", value: coordinators.length, detail: "Assigned teachers", tone: "bg-green-100 text-green-800" },
+    { label: "Active sections", value: sections.length, detail: "Organization sections", tone: "bg-slate-100 text-slate-700" },
+    { label: "Assessments", value: assessments.length, detail: "Created assessments", tone: "bg-amber-100 text-amber-800" },
+  ];
+
   return (
     <>
       <SectionIntro
@@ -446,10 +490,11 @@ function AdminDashboard({
           </Button>
         }
       />
+      {loadError ? <ApiNotice message={loadError} /> : null}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {adminMetrics.map((metric) => (
+        {metrics.map((metric) => (
           <Card key={metric.label}>
-            <CardContent className="p-4">
+            <CardContent className="min-h-28 p-5">
               <div className={`mb-4 inline-flex rounded-lg px-3 py-2 text-sm font-semibold ${metric.tone}`}>{metric.label}</div>
               <p className="text-3xl font-bold">{metric.value}</p>
               <p className="text-sm text-muted-foreground">{metric.detail}</p>
@@ -464,7 +509,7 @@ function AdminDashboard({
             <CardDescription>Students are managed through their assigned sections.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {sections.map((section) => (
+            {loading ? <SkeletonRows rows={3} /> : sections.length ? sections.map((section) => (
               <div key={section.id} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -477,7 +522,9 @@ function AdminDashboard({
                 </div>
                 <DonutProgress value={section.readiness} size="sm" className="justify-self-start sm:justify-self-end" />
               </div>
-            ))}
+            )) : (
+              <EmptyState icon={Layers} title="No sections yet" description="Create a section to organize students, teachers, and assessments." />
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -518,6 +565,8 @@ function StudentDetail({
   sections: SectionRow[];
   onMoveStudent: (studentId: string, sectionName: string) => Promise<void>;
 }) {
+  const [moving, setMoving] = useState(false);
+
   return (
     <Card>
       <CardHeader>
@@ -566,9 +615,17 @@ function StudentDetail({
         {student ? <div className="space-y-2">
           <label className="text-sm font-medium">Move to section</label>
           <select
-            className="h-10 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
+            className="h-11 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
             value={student.section}
-            onChange={(event) => onMoveStudent(student.id, event.target.value)}
+            disabled={moving}
+            onChange={async (event) => {
+              setMoving(true);
+              try {
+                await onMoveStudent(student.id, event.target.value);
+              } finally {
+                setMoving(false);
+              }
+            }}
           >
             {sections.map((section) => (
               <option key={section.id}>{section.name}</option>
@@ -587,6 +644,7 @@ function StudentsAdmin({
   onSelectStudent,
   onCreateStudent,
   onMoveStudent,
+  loading,
 }: {
   sections: SectionRow[];
   students: AdminStudentRow[];
@@ -603,6 +661,7 @@ function StudentsAdmin({
     password?: string;
   }) => Promise<void>;
   onMoveStudent: (studentId: string, sectionName: string) => Promise<void>;
+  loading: boolean;
 }) {
   const [sectionFilter, setSectionFilter] = useState(sections[0]?.name ?? "");
   const [showCreate, setShowCreate] = useState(false);
@@ -630,7 +689,7 @@ function StudentsAdmin({
               <CardDescription>{filteredStudents.length} students in selected section.</CardDescription>
             </div>
             <select
-              className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm md:w-72"
+              className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm md:w-72"
               value={sectionFilter}
               onChange={(event) => setSectionFilter(event.target.value)}
             >
@@ -640,7 +699,7 @@ function StudentsAdmin({
             </select>
           </CardHeader>
           <CardContent className="space-y-3">
-            {filteredStudents.length ? filteredStudents.map((student) => (
+            {loading ? <SkeletonRows rows={4} /> : filteredStudents.length ? filteredStudents.map((student) => (
               <button
                 key={student.id}
                 className={`grid w-full gap-3 rounded-lg border p-3 text-left md:grid-cols-[minmax(0,1fr)_180px_120px] md:items-center ${
@@ -656,9 +715,7 @@ function StudentsAdmin({
                 <Badge variant={student.pending > 4 ? "danger" : "outline"}>{student.pending} pending</Badge>
               </button>
             )) : (
-              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                No students available yet.
-              </div>
+              <EmptyState icon={Users} title="No students yet" description="Add students after creating or selecting a section." />
             )}
           </CardContent>
         </Card>
@@ -694,6 +751,7 @@ function CreateStudentForm({
     section: sections[0]?.id ?? "",
     password: "",
   });
+  const [submitting, setSubmitting] = useState(false);
 
   return (
     <Card>
@@ -704,14 +762,19 @@ function CreateStudentForm({
       <CardContent>
         <form
           className="grid gap-3 md:grid-cols-4"
-          onSubmit={(event) => {
+          onSubmit={async (event) => {
             event.preventDefault();
-            onCreateStudent({
-              ...form,
-              section: form.section || undefined,
-              password: form.password.trim() || undefined,
-            });
-            setForm((current) => ({ ...current, name: "", email: "", phoneNumber: "", registrationNumber: "", password: "" }));
+            setSubmitting(true);
+            try {
+              await onCreateStudent({
+                ...form,
+                section: form.section || undefined,
+                password: form.password.trim() || undefined,
+              });
+              setForm((current) => ({ ...current, name: "", email: "", phoneNumber: "", registrationNumber: "", password: "" }));
+            } finally {
+              setSubmitting(false);
+            }
           }}
         >
           <Input required placeholder="Student name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
@@ -720,12 +783,15 @@ function CreateStudentForm({
           <Input required placeholder="Registration number" value={form.registrationNumber} onChange={(event) => setForm((current) => ({ ...current, registrationNumber: event.target.value }))} />
           <Input required placeholder="Department" value={form.department} onChange={(event) => setForm((current) => ({ ...current, department: event.target.value }))} />
           <Input required placeholder="Batch" value={form.batch} onChange={(event) => setForm((current) => ({ ...current, batch: event.target.value }))} />
-          <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={form.section} onChange={(event) => setForm((current) => ({ ...current, section: event.target.value }))}>
+          <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={form.section} onChange={(event) => setForm((current) => ({ ...current, section: event.target.value }))}>
             <option value="">No section</option>
             {sections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
           </select>
           <Input placeholder="Password optional" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} />
-          <Button className="md:col-span-4" type="submit">Create Student</Button>
+          <Button className="md:col-span-4" type="submit" disabled={submitting}>
+            {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+            {submitting ? "Creating..." : "Create Student"}
+          </Button>
         </form>
       </CardContent>
     </Card>
@@ -741,6 +807,7 @@ function SectionsAdmin({
   onSelectSection,
   onSelectStudent,
   onMoveStudent,
+  loading,
 }: {
   sections: SectionRow[];
   students: AdminStudentRow[];
@@ -750,6 +817,7 @@ function SectionsAdmin({
   onSelectSection: (sectionId: string) => void;
   onSelectStudent: (studentId: string) => void;
   onMoveStudent: (studentId: string, sectionName: string) => Promise<void>;
+  loading: boolean;
 }) {
   const [showForm, setShowForm] = useState(false);
   const sectionStudents = selectedSection ? students.filter((student) => student.section === selectedSection.name) : [];
@@ -775,7 +843,7 @@ function SectionsAdmin({
             <CardDescription>Purpose and student count.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {sections.length ? sections.map((section) => (
+            {loading ? <SkeletonRows rows={4} /> : sections.length ? sections.map((section) => (
               <button
                 key={section.id}
                 className={`w-full rounded-lg border p-3 text-left ${selectedSection?.id === section.id ? "border-primary bg-primary/5" : "bg-white"}`}
@@ -793,9 +861,7 @@ function SectionsAdmin({
                 </div>
               </button>
             )) : (
-              <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-                No sections available yet.
-              </div>
+              <EmptyState icon={Layers} title="No sections yet" description="Create your first section to begin adding students and assigning teachers." />
             )}
           </CardContent>
         </Card>
@@ -829,9 +895,7 @@ function SectionsAdmin({
                 <Eye className="h-4 w-4 text-primary" />
               </button>
             )) : (
-              <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                No students in this section yet. Move students here from the student detail panel.
-              </div>
+              <EmptyState icon={Users} title="No students in this section" description="Add students or move existing students into this section." />
             )}
           </CardContent>
         </Card>
@@ -848,6 +912,7 @@ function CreateSectionForm({ onCreateSection }: { onCreateSection: (section: Sec
   const [code, setCode] = useState("");
   const [department, setDepartment] = useState("");
   const [batch, setBatch] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   return (
     <Card>
@@ -858,32 +923,40 @@ function CreateSectionForm({ onCreateSection }: { onCreateSection: (section: Sec
       <CardContent>
         <form
           className="grid gap-3 md:grid-cols-4"
-          onSubmit={(event) => {
+          onSubmit={async (event) => {
             event.preventDefault();
             const sectionName = name.trim();
             if (!sectionName || !code.trim() || !department.trim() || !batch.trim()) return;
-            onCreateSection({
-              id: crypto.randomUUID(),
-              name: sectionName,
-              code: code.trim(),
-              department,
-              batch,
-              academicYear: "",
-              students: 0,
-              coordinator: "Unassigned",
-              readiness: 0,
-              status: "Active",
-              description: "",
-            });
-            setName("");
-            setCode("");
+            setSubmitting(true);
+            try {
+              await onCreateSection({
+                id: crypto.randomUUID(),
+                name: sectionName,
+                code: code.trim(),
+                department,
+                batch,
+                academicYear: "",
+                students: 0,
+                coordinator: "Unassigned",
+                readiness: 0,
+                status: "Active",
+                description: "",
+              });
+              setName("");
+              setCode("");
+            } finally {
+              setSubmitting(false);
+            }
           }}
         >
           <Input placeholder="Section name" value={name} onChange={(event) => setName(event.target.value)} />
           <Input placeholder="Section code" value={code} onChange={(event) => setCode(event.target.value)} />
           <Input placeholder="Department" value={department} onChange={(event) => setDepartment(event.target.value)} />
           <Input placeholder="Batch" value={batch} onChange={(event) => setBatch(event.target.value)} />
-          <Button className="md:col-span-4" type="submit">Create Section</Button>
+          <Button className="md:col-span-4" type="submit" disabled={submitting}>
+            {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            {submitting ? "Creating..." : "Create Section"}
+          </Button>
         </form>
       </CardContent>
     </Card>
@@ -902,6 +975,7 @@ function CoordinatorsAdmin({
   onCreateOrganizationUser,
   onSyncRoles,
   onUpdateApiRolePermissions,
+  loading,
 }: {
   coordinators: CoordinatorRow[];
   organizationUsers: ApiUser[];
@@ -920,6 +994,7 @@ function CoordinatorsAdmin({
   }) => Promise<ApiUser | undefined>;
   onSyncRoles: () => Promise<void>;
   onUpdateApiRolePermissions: (roleId: string, permissions: string[]) => Promise<void>;
+  loading: boolean;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -929,6 +1004,18 @@ function CoordinatorsAdmin({
   const [section, setSection] = useState(sections[0]?.name ?? "");
   const [roleName, setRoleName] = useState("");
   const [permissions, setPermissions] = useState("");
+  const [coordinatorSubmitting, setCoordinatorSubmitting] = useState(false);
+  const [syncingRoles, setSyncingRoles] = useState(false);
+  const [savingRoleId, setSavingRoleId] = useState("");
+
+  async function handleSyncRoles() {
+    setSyncingRoles(true);
+    try {
+      await onSyncRoles();
+    } finally {
+      setSyncingRoles(false);
+    }
+  }
 
   return (
     <>
@@ -936,7 +1023,12 @@ function CoordinatorsAdmin({
         eyebrow="Coordinators"
         title="Add coordinators and create permission roles."
         description="Coordinator access is role-based, and coordinators can be assigned to sections and workflows."
-        action={<Button onClick={onSyncRoles}><ShieldCheck className="h-4 w-4" />Sync Roles</Button>}
+        action={
+          <Button onClick={handleSyncRoles} disabled={syncingRoles}>
+            {syncingRoles ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+            {syncingRoles ? "Syncing..." : "Sync Roles"}
+          </Button>
+        }
       />
       <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_430px]">
         <Card>
@@ -959,33 +1051,38 @@ function CoordinatorsAdmin({
                   sections: [section],
                   status: "Active",
                 };
-                const createdUser = await onCreateOrganizationUser({
-                  name,
-                  email,
-                  phoneNumber,
-                  roleName: "teacher",
-                  password: password.trim() || undefined,
-                });
-                await onAddCoordinator(coordinator, createdUser?.id);
-                setName("");
-                setEmail("");
-                setPhoneNumber("");
-                setPassword("");
+                setCoordinatorSubmitting(true);
+                try {
+                  const createdUser = await onCreateOrganizationUser({
+                    name,
+                    email,
+                    phoneNumber,
+                    roleName: "teacher",
+                    password: password.trim() || undefined,
+                  });
+                  await onAddCoordinator(coordinator, createdUser?.id);
+                  setName("");
+                  setEmail("");
+                  setPhoneNumber("");
+                  setPassword("");
+                } finally {
+                  setCoordinatorSubmitting(false);
+                }
               }}
             >
               <Input required placeholder="Coordinator name" value={name} onChange={(event) => setName(event.target.value)} />
               <Input required placeholder="Email address" value={email} onChange={(event) => setEmail(event.target.value)} />
               <Input placeholder="Phone number" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} />
               <Input placeholder="Password optional" value={password} onChange={(event) => setPassword(event.target.value)} />
-              <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={role} onChange={(event) => setRole(event.target.value)}>
+              <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={role} onChange={(event) => setRole(event.target.value)}>
                 {roles.map((item) => <option key={item.id}>{item.name}</option>)}
               </select>
-              <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={section} onChange={(event) => setSection(event.target.value)}>
+              <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={section} onChange={(event) => setSection(event.target.value)}>
                 {sections.map((item) => <option key={item.id}>{item.name}</option>)}
               </select>
-              <Button type="submit">
-                <UserPlus className="h-4 w-4" />
-                Add Coordinator
+              <Button type="submit" disabled={coordinatorSubmitting}>
+                {coordinatorSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                {coordinatorSubmitting ? "Adding..." : "Add Coordinator"}
               </Button>
             </form>
           </CardContent>
@@ -1021,7 +1118,7 @@ function CoordinatorsAdmin({
             <CardDescription>Assigned sections and roles.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {coordinators.map((coordinator) => (
+            {loading ? <SkeletonRows rows={3} /> : coordinators.map((coordinator) => (
               <div key={coordinator.id} className="rounded-lg border p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-semibold">{coordinator.name}</p>
@@ -1030,7 +1127,7 @@ function CoordinatorsAdmin({
                 <p className="mt-1 text-sm text-muted-foreground">{coordinator.email} · {coordinator.sections.join(", ")}</p>
               </div>
             ))}
-            {organizationUsers.filter((user) => user.role === "teacher").map((user) => (
+            {!loading ? organizationUsers.filter((user) => user.role === "teacher").map((user) => (
               <div key={user.id} className="rounded-lg border p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-semibold">{user.name}</p>
@@ -1038,7 +1135,10 @@ function CoordinatorsAdmin({
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{user.email} · API user</p>
               </div>
-            ))}
+            )) : null}
+            {!loading && !coordinators.length && !organizationUsers.filter((user) => user.role === "teacher").length ? (
+              <EmptyState icon={ShieldCheck} title="No coordinators yet" description="Create teacher accounts and assign them to sections when your organization is ready." />
+            ) : null}
           </CardContent>
         </Card>
         <Card>
@@ -1047,38 +1147,42 @@ function CoordinatorsAdmin({
             <CardDescription>Coordinator role-based access.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {apiRoles.length ? apiRoles.map((item) => (
+            {loading ? <SkeletonRows rows={3} /> : apiRoles.length ? apiRoles.map((item) => (
               <div key={item._id} className="rounded-lg border p-3">
                 <p className="font-semibold">{item.displayName}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{item.name}</p>
                 <div className="mt-3 grid gap-2">
                   {apiPermissions.map((permission) => (
-                    <label key={permission} className="flex items-center gap-2 text-sm">
+                    <label key={permission} className="flex min-h-11 items-center gap-2 text-sm">
                       <input
-                        className="h-4 w-4 accent-primary"
+                        className="h-5 w-5 accent-primary"
                         type="checkbox"
-                        disabled={!item.isEditable}
+                      disabled={!item.isEditable || Boolean(savingRoleId)}
                         checked={item.permissions.includes(permission)}
                         onChange={(event) => {
                           const nextPermissions = event.target.checked
                             ? [...item.permissions, permission]
                             : item.permissions.filter((current) => current !== permission);
-                          onUpdateApiRolePermissions(item._id, nextPermissions);
+                          setSavingRoleId(item._id);
+                          onUpdateApiRolePermissions(item._id, nextPermissions).finally(() => setSavingRoleId(""));
                         }}
                       />
                       {permission}
                     </label>
                   ))}
                 </div>
+                {savingRoleId === item._id ? <p className="text-xs text-muted-foreground">Saving permissions...</p> : null}
               </div>
-            )) : roles.map((item) => (
+            )) : roles.length ? roles.map((item) => (
               <div key={item.id} className="rounded-lg border p-3">
                 <p className="font-semibold">{item.name}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {item.permissions.map((permission) => <Badge key={permission} variant="outline">{permission}</Badge>)}
                 </div>
               </div>
-            ))}
+            )) : (
+              <EmptyState icon={ShieldCheck} title="No roles available" description="Sync organization roles to prepare admin, teacher, and student permissions." />
+            )}
           </CardContent>
         </Card>
       </section>
@@ -1108,13 +1212,13 @@ function TasksAdmin({ tasks, sections, onAddTask }: { tasks: AdminTask[]; sectio
           <CardContent className="space-y-3">
             <Input placeholder="Task title" value={title} onChange={(event) => setTitle(event.target.value)} />
             <div className="grid gap-3 sm:grid-cols-2">
-              <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={type} onChange={(event) => setType(event.target.value)}>
+              <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={type} onChange={(event) => setType(event.target.value)}>
                 <option>Daily Task</option>
                 <option>Placement Homework</option>
                 <option>Coding Practice</option>
                 <option>Resume Review</option>
               </select>
-              <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)}>
+              <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)}>
                 {sections.map((section) => <option key={section.id}>{section.name}</option>)}
               </select>
             </div>
@@ -1132,7 +1236,7 @@ function TasksAdmin({ tasks, sections, onAddTask }: { tasks: AdminTask[]; sectio
           <CardDescription>Created tasks and submission progress.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {tasks.map((task) => (
+          {tasks.length ? tasks.map((task) => (
             <div key={task.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_140px_120px] md:items-center">
               <div>
                 <p className="font-semibold">{task.title}</p>
@@ -1141,7 +1245,9 @@ function TasksAdmin({ tasks, sections, onAddTask }: { tasks: AdminTask[]; sectio
               <Badge variant="outline">{task.status}</Badge>
               <p className="text-sm text-muted-foreground">{task.submissions} submissions</p>
             </div>
-          ))}
+          )) : (
+            <EmptyState icon={ClipboardList} title="No tasks yet" description="Create a task to assign preparation work to students." />
+          )}
         </CardContent>
       </Card>
     </>
@@ -1159,7 +1265,7 @@ function StudentTaskPreview({ title, type, assignedTo }: { title: string; type: 
         <div className="rounded-lg border bg-primary/5 p-4">
           <Badge>{type}</Badge>
           <h3 className="mt-3 text-lg font-bold">{title}</h3>
-          <p className="mt-2 text-sm text-muted-foreground">Assigned to {assignedTo}. Due tomorrow at 5:00 PM.</p>
+          <p className="mt-2 text-sm text-muted-foreground">{assignedTo ? `Assigned to ${assignedTo}.` : "Audience not selected."} Due date will be set during publish.</p>
         </div>
         <div className="rounded-lg border p-3 text-sm text-muted-foreground">
           Students will see instructions, attachments, comments, upload controls, and coordinator feedback after review.
@@ -1175,30 +1281,25 @@ function AssessmentsAdmin({
   sections,
   onAddAssessment,
   onCreateValidatedAssessment,
+  loading,
 }: {
   assessments: AdminAssessment[];
   sections: SectionRow[];
   onAddAssessment: (assessment: AdminAssessment) => void;
   onCreateValidatedAssessment: (assessment: AdminAssessment & { questions: Array<{ id: string; type: string; text: string; options: string[]; marks: string; correctAnswer?: string }> }) => Promise<void>;
+  loading: boolean;
 }) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState("Written Test");
   const [assignedTo, setAssignedTo] = useState(sections[0]?.name ?? "");
-  const [instructions, setInstructions] = useState("Answer all sections. Follow timing and submission rules.");
-  const [rubric, setRubric] = useState("Aptitude 40%, Technical 40%, Communication 20%");
+  const [instructions, setInstructions] = useState("");
+  const [rubric, setRubric] = useState("");
   const [questionType, setQuestionType] = useState("MCQ");
   const [questionText, setQuestionText] = useState("");
-  const [questionOptions, setQuestionOptions] = useState("Option A, Option B, Option C, Option D");
-  const [questionMarks, setQuestionMarks] = useState("5");
-  const [questions, setQuestions] = useState([
-    {
-      id: "question-1",
-      type: "MCQ",
-      text: "Choose the most efficient data structure for balanced parentheses.",
-      options: ["Queue", "Stack", "Hash Map", "Tree"],
-      marks: "5",
-    },
-  ]);
+  const [questionOptions, setQuestionOptions] = useState("");
+  const [questionMarks, setQuestionMarks] = useState("");
+  const [questions, setQuestions] = useState<Array<{ id: string; type: string; text: string; options: string[]; marks: string }>>([]);
+  const [submitting, setSubmitting] = useState(false);
 
   const previewTitle = title || "Untitled assessment";
 
@@ -1234,18 +1335,18 @@ function AssessmentsAdmin({
           <CardContent className="space-y-3">
             <Input placeholder="Assessment title" value={title} onChange={(event) => setTitle(event.target.value)} />
             <div className="grid gap-3 sm:grid-cols-3">
-              <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={type} onChange={(event) => setType(event.target.value)}>
+              <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={type} onChange={(event) => setType(event.target.value)}>
                 <option>Written Test</option>
                 <option>Mock Interview</option>
                 <option>Group Discussion</option>
                 <option>Coding Round</option>
               </select>
-              <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)}>
+              <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)}>
                 {sections.map((section) => <option key={section.id}>{section.name}</option>)}
                 <option>Aptitude Group</option>
                 <option>Interview Group</option>
               </select>
-              <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm">
+              <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm">
                 <option>60 min</option>
                 <option>30 min</option>
                 <option>45 min</option>
@@ -1257,10 +1358,10 @@ function AssessmentsAdmin({
             <div className="rounded-lg border bg-background p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-semibold">Question Builder</p>
-                <Badge variant="outline">{questions.length} questions</Badge>
+                <Badge variant="outline">{questions.length} {questions.length === 1 ? "question" : "questions"}</Badge>
               </div>
               <div className="mt-3 grid gap-3 sm:grid-cols-[160px_120px_minmax(0,1fr)]">
-                <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={questionType} onChange={(event) => setQuestionType(event.target.value)}>
+                <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={questionType} onChange={(event) => setQuestionType(event.target.value)}>
                   <option>MCQ</option>
                   <option>Short Answer</option>
                   <option>Code Question</option>
@@ -1292,13 +1393,20 @@ function AssessmentsAdmin({
             </div>
             <Button
               className="w-full"
-              onClick={() => {
-                const assessment = { id: crypto.randomUUID(), title: previewTitle, type, assignedTo, duration: "60 min", instructions, rubric, status: `Draft · ${questions.length} questions`, questions };
-                onAddAssessment(assessment);
-                onCreateValidatedAssessment(assessment);
+              disabled={submitting || !title.trim() || !assignedTo || !instructions.trim() || !questions.length}
+              onClick={async () => {
+                const assessment = { id: crypto.randomUUID(), title: previewTitle, type, assignedTo, duration: "60 min", instructions, rubric, status: `Draft · ${questions.length} ${questions.length === 1 ? "question" : "questions"}`, questions };
+                setSubmitting(true);
+                try {
+                  onAddAssessment(assessment);
+                  await onCreateValidatedAssessment(assessment);
+                } finally {
+                  setSubmitting(false);
+                }
               }}
             >
-              Validate & Create Assessment
+              {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+              {submitting ? "Validating..." : "Validate & Create Assessment"}
             </Button>
           </CardContent>
         </Card>
@@ -1310,7 +1418,7 @@ function AssessmentsAdmin({
           <CardDescription>Created assessments and publish state.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {assessments.map((assessment) => (
+          {loading ? <SkeletonRows rows={3} /> : assessments.length ? assessments.map((assessment) => (
             <div key={assessment.id} className="rounded-lg border p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-semibold">{assessment.title}</p>
@@ -1318,7 +1426,9 @@ function AssessmentsAdmin({
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{assessment.type} · {assessment.assignedTo} · {assessment.duration}</p>
             </div>
-          ))}
+          )) : (
+            <EmptyState icon={FileText} title="No assessments yet" description="Create and validate an assessment before publishing it to students." />
+          )}
         </CardContent>
       </Card>
     </>
@@ -1354,11 +1464,11 @@ function AssessmentPreview({
         </div>
         <div className="rounded-lg border p-3">
           <p className="text-sm font-semibold">Instructions</p>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{instructions}</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{instructions || "Instructions will appear here once added."}</p>
         </div>
         <div className="rounded-lg border p-3">
           <p className="text-sm font-semibold">Rubric</p>
-          <p className="mt-2 text-sm text-muted-foreground">{rubric}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{rubric || "Rubric details will appear here once added."}</p>
         </div>
         <div className="rounded-lg border p-3">
           <div className="flex items-center justify-between gap-3">
@@ -1380,6 +1490,9 @@ function AssessmentPreview({
                 )}
               </div>
             ))}
+            {!questions.length ? (
+              <EmptyState icon={FileText} title="No questions yet" description="Add questions to validate and publish this assessment." />
+            ) : null}
           </div>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
@@ -1410,12 +1523,12 @@ function AnnouncementsAdmin({ onAction, sections }: { onAction: (message: string
           <Input placeholder="Announcement title" />
           <textarea className="min-h-36 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" placeholder="Write announcement content" />
           <div className="grid gap-3 sm:grid-cols-3">
-            <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm">
+            <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm">
               {sections.map((section) => <option key={section.id}>{section.name}</option>)}
               <option>All Students</option>
               <option>Coding Group</option>
             </select>
-            <select className="h-10 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm">
+            <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm">
               <option>Normal</option>
               <option>Important</option>
               <option>Urgent</option>
@@ -1483,7 +1596,7 @@ function ReportsAdmin({ sections, students }: { sections: SectionRow[]; students
             <CardDescription>Placed and pending students by section.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
-            {sections.map((section) => {
+            {sections.length ? sections.map((section) => {
               const sectionStudents = students.filter((student) => student.section === section.name);
               const sectionPlaced = sectionStudents.filter((student) => student.placementStatus === "Placed").length;
               const sectionRate = Math.round((sectionPlaced / Math.max(sectionStudents.length, 1)) * 100);
@@ -1502,7 +1615,11 @@ function ReportsAdmin({ sections, students }: { sections: SectionRow[]; students
                   </div>
                 </div>
               );
-            })}
+            }) : (
+              <div className="md:col-span-2">
+                <EmptyState icon={Layers} title="No section reports yet" description="Create sections and add students to generate placement reports." />
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1512,14 +1629,16 @@ function ReportsAdmin({ sections, students }: { sections: SectionRow[]; students
             <CardDescription>Offers received by company.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {Object.values(companyStats).map((item) => (
+            {Object.values(companyStats).length ? Object.values(companyStats).map((item) => (
               <div key={item.company} className="rounded-lg border p-3">
                 <p className="font-semibold">{item.company}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {item.count} offer{item.count > 1 ? "s" : ""} · Best {item.bestPackage} LPA
                 </p>
               </div>
-            ))}
+            )) : (
+              <EmptyState icon={BarChart3} title="No company outcomes yet" description="Placed student outcomes will appear here when available." />
+            )}
           </CardContent>
         </Card>
       </section>
@@ -1551,7 +1670,7 @@ function PlacementStudentList({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {students.map((student) => (
+        {students.length ? students.map((student) => (
           <div key={student.id} className="rounded-lg border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
@@ -1568,7 +1687,9 @@ function PlacementStudentList({
                 : student.placementRound}
             </p>
           </div>
-        ))}
+        )) : (
+          <EmptyState icon={Users} title={`No ${title.toLowerCase()}`} description="Matching students will appear here after placement status updates." />
+        )}
       </CardContent>
     </Card>
   );
@@ -1585,8 +1706,8 @@ function GroupsAdmin({ onAction }: { onAction: (message: string) => void }) {
       />
       <section className="grid gap-4 md:grid-cols-3">
         <Card className="md:col-span-3">
-          <CardContent className="p-6 text-sm text-muted-foreground">
-            No groups available yet.
+          <CardContent className="p-4 sm:p-5">
+            <EmptyState icon={Users} title="No groups yet" description="Create groups after students and sections are ready." />
           </CardContent>
         </Card>
       </section>

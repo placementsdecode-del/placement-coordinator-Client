@@ -9,12 +9,12 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
 Card.displayName = "Card";
 
 const CardHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col space-y-1.5 p-4 sm:p-5", className)} {...props} />
+  <div className={cn("flex flex-col space-y-1.5 p-5", className)} {...props} />
 );
 
 const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
   ({ className, ...props }, ref) => (
-    <h3 ref={ref} className={cn("text-base font-semibold leading-none tracking-normal", className)} {...props} />
+    <h3 ref={ref} className={cn("text-base font-semibold leading-6 tracking-normal", className)} {...props} />
   ),
 );
 CardTitle.displayName = "CardTitle";
@@ -24,7 +24,7 @@ const CardDescription = ({ className, ...props }: React.HTMLAttributes<HTMLParag
 );
 
 const CardContent = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("p-4 pt-0 sm:p-5 sm:pt-0", className)} {...props} />
+  <div className={cn("p-5 pt-0", className)} {...props} />
 );
 
 export { Card, CardHeader, CardTitle, CardDescription, CardContent };
