@@ -84,8 +84,6 @@ export function AdminSection({
         listPermissions(),
       ]);
       setOrganizationUsers(users);
-      const studentRows = users.filter((user) => user.role === "student").map(mapStudentUser);
-      setStudents(studentRows);
       setApiRoles(roleRows);
       setApiPermissions(permissionRows);
       setLoadError("");
@@ -103,6 +101,10 @@ export function AdminSection({
   useEffect(() => {
     refreshOrganizationUsers();
   }, [refreshOrganizationUsers]);
+
+  useEffect(() => {
+    setStudents(organizationUsers.filter((user) => user.role === "student").map((user) => mapStudentUser(user, apiSections)));
+  }, [organizationUsers, apiSections]);
 
   const refreshOrganizationWork = useCallback(async () => {
     const organizationId = getOrganizationId(currentUser?.organization);
@@ -418,8 +420,11 @@ function mapSection(section: ApiSection): SectionRow {
   };
 }
 
-function mapStudentUser(user: ApiUser): AdminStudentRow {
-  const sectionName = typeof user.section === "object" && user.section ? user.section.name : "Unassigned";
+function mapStudentUser(user: ApiUser, sections: ApiSection[] = []): AdminStudentRow {
+  const sectionName =
+    typeof user.section === "object" && user.section
+      ? user.section.name
+      : sections.find((section) => section._id === user.section)?.name ?? "Unassigned";
 
   return {
     id: user.id,
@@ -775,7 +780,7 @@ function CreateStudentForm({
 
   const formContent = (
     <form
-          className="grid gap-3 md:grid-cols-4"
+          className="grid max-w-5xl gap-3 md:grid-cols-4"
           onSubmit={async (event) => {
             event.preventDefault();
             setSubmitting(true);
@@ -983,7 +988,7 @@ function CreateSectionForm({ onCreateSection }: { onCreateSection: (section: Sec
       </CardHeader>
       <CardContent>
         <form
-          className="grid gap-3 md:grid-cols-4"
+          className="grid max-w-5xl gap-3 md:grid-cols-4"
           onSubmit={async (event) => {
             event.preventDefault();
             const sectionName = name.trim();
@@ -1101,7 +1106,7 @@ function CoordinatorsAdmin({
           </CardHeader>
           <CardContent>
             <form
-              className="grid gap-3 md:grid-cols-2"
+              className="grid max-w-3xl gap-3 md:grid-cols-2"
               onSubmit={async (event) => {
                 event.preventDefault();
                 if (!name.trim() || !email.trim()) return;
@@ -1157,7 +1162,7 @@ function CoordinatorsAdmin({
           </CardHeader>
           <CardContent className="space-y-3">
             <Input placeholder="Role name" value={roleName} onChange={(event) => setRoleName(event.target.value)} />
-            <textarea className="min-h-24 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={permissions} onChange={(event) => setPermissions(event.target.value)} />
+            <textarea className="min-h-24 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" placeholder="Comma-separated permissions" value={permissions} onChange={(event) => setPermissions(event.target.value)} />
             <Button
               onClick={() => {
                 onAddRole({
@@ -1272,6 +1277,7 @@ function TasksAdmin({ tasks, sections, onAddTask }: { tasks: AdminTask[]; sectio
             <CardDescription>Task setup and assignment.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="max-w-3xl space-y-3">
             <Input placeholder="Task title" value={title} onChange={(event) => setTitle(event.target.value)} />
             <div className="grid gap-3 sm:grid-cols-2">
               <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={type} onChange={(event) => setType(event.target.value)}>
@@ -1289,6 +1295,7 @@ function TasksAdmin({ tasks, sections, onAddTask }: { tasks: AdminTask[]; sectio
               <Button onClick={() => onAddTask({ id: crypto.randomUUID(), title: previewTitle, type, assignedTo, due: "Tomorrow, 5:00 PM", status: "Draft", submissions: 0 })}>
                 Create Task
               </Button>
+            </div>
             </div>
           </CardContent>
         </Card>
@@ -1399,6 +1406,7 @@ function AssessmentsAdmin({
             <CardDescription>Type, target audience, rules, duration, and rubric.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="max-w-4xl space-y-3">
             <Input placeholder="Assessment title" value={title} onChange={(event) => setTitle(event.target.value)} />
             <div className="grid gap-3 sm:grid-cols-3">
               <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={type} onChange={(event) => setType(event.target.value)}>
@@ -1419,8 +1427,8 @@ function AssessmentsAdmin({
                 <option>Panel slot</option>
               </select>
             </div>
-            <textarea className="min-h-28 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={instructions} onChange={(event) => setInstructions(event.target.value)} />
-            <Input value={rubric} onChange={(event) => setRubric(event.target.value)} />
+            <textarea className="min-h-28 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" placeholder="Instructions students should read before starting" value={instructions} onChange={(event) => setInstructions(event.target.value)} />
+            <Input placeholder="Rubric or passing criteria" value={rubric} onChange={(event) => setRubric(event.target.value)} />
             <div className="rounded-lg border bg-background p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-semibold">Question Builder</p>
@@ -1473,6 +1481,7 @@ function AssessmentsAdmin({
               {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
               {submitting ? "Validating..." : "Validate & Create Assessment"}
             </Button>
+            </div>
           </CardContent>
         </Card>
         <AssessmentPreview title={previewTitle} type={type} assignedTo={assignedTo} instructions={instructions} rubric={rubric} questions={questions} />
@@ -1660,7 +1669,7 @@ function ReportsAdmin({ sections, students }: { sections: SectionRow[]; students
             <CardTitle>Section Placement View</CardTitle>
             <CardDescription>Placed and pending students by section.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
+          <CardContent className="grid max-w-3xl gap-3 md:grid-cols-2">
             {sections.length ? sections.map((section) => {
               const sectionStudents = students.filter((student) => student.section === section.name);
               const sectionPlaced = sectionStudents.filter((student) => student.placementStatus === "Placed").length;
@@ -1804,14 +1813,14 @@ function SettingsAdmin({ onAction }: { onAction: (message: string) => void }) {
             <CardDescription>These values become defaults for student accounts under this organization.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-2">
-              <Input value={orgName} onChange={(event) => setOrgName(event.target.value)} />
-              <Input value={shortName} onChange={(event) => setShortName(event.target.value)} />
-              <Input value={academicYear} onChange={(event) => setAcademicYear(event.target.value)} />
-              <Input value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} />
-              <Input value={defaultDepartment} onChange={(event) => setDefaultDepartment(event.target.value)} />
-              <Input value={supportContact} onChange={(event) => setSupportContact(event.target.value)} />
-              <Input className="md:col-span-2" value={studentPortalTitle} onChange={(event) => setStudentPortalTitle(event.target.value)} />
+            <div className="grid max-w-3xl gap-3 md:grid-cols-2">
+              <Input placeholder="Organization name" value={orgName} onChange={(event) => setOrgName(event.target.value)} />
+              <Input placeholder="Short name" value={shortName} onChange={(event) => setShortName(event.target.value)} />
+              <Input placeholder="Academic year" value={academicYear} onChange={(event) => setAcademicYear(event.target.value)} />
+              <Input placeholder="Admin contact email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} />
+              <Input placeholder="Default department" value={defaultDepartment} onChange={(event) => setDefaultDepartment(event.target.value)} />
+              <Input placeholder="Student support contact" value={supportContact} onChange={(event) => setSupportContact(event.target.value)} />
+              <Input className="md:col-span-2" placeholder="Student portal title" value={studentPortalTitle} onChange={(event) => setStudentPortalTitle(event.target.value)} />
             </div>
             <div className="grid gap-3 md:grid-cols-[140px_minmax(0,1fr)]">
               <div className="rounded-lg border bg-background p-4 text-center">
@@ -1822,7 +1831,7 @@ function SettingsAdmin({ onAction }: { onAction: (message: string) => void }) {
               </div>
               <div className="space-y-3">
                 <Input placeholder="Logo file name or URL" />
-                <Input value={brandColor} onChange={(event) => setBrandColor(event.target.value)} />
+                <Input placeholder="Brand color" value={brandColor} onChange={(event) => setBrandColor(event.target.value)} />
                 <Button variant="outline" onClick={() => onAction("Organization logo upload selected.")}>
                   Upload Organization Logo
                 </Button>

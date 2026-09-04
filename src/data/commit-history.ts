@@ -4,6 +4,23 @@ import type { CommitEntry } from "@/types/super-admin";
 // `files` is capped at the top 12 changed files per commit; `filesChanged` is the true total.
 export const commitHistory: CommitEntry[] = [
   {
+    hash: "6c2c062",
+    author: "naveed-devz",
+    date: "2026-09-05",
+    message: "Fix admin section and review flows",
+    area: "Admin",
+    body: "",
+    filesChanged: 4,
+    insertions: 246,
+    deletions: 69,
+    files: [
+        { path: "src/sections/super-admin/super-admin-section.tsx", added: 120, removed: 41, patch: "", patchTruncated: false },
+        { path: "src/sections/admin/admin-section.tsx", added: 95, removed: 28, patch: "", patchTruncated: false },
+        { path: "src/data/commit-history.ts", added: 24, removed: 0, patch: "", patchTruncated: false },
+        { path: "src/types/super-admin.ts", added: 7, removed: 0, patch: "", patchTruncated: false },
+    ],
+  },
+  {
     hash: "2c512fe",
     author: "naveed-devz",
     date: "2026-09-05",

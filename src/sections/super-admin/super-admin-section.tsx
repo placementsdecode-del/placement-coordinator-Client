@@ -408,17 +408,25 @@ function OrganizationsPage({
             {selectedOrg ? (
               <>
                 <div className="grid grid-cols-2 gap-3">
-                  <InfoTile label="Plan" value={selectedOrg.plan} />
                   <InfoTile label="Status" value={selectedOrg.status} />
                   <InfoTile label="Students" value={String(selectedOrg.students)} />
                   <InfoTile label="Coordinators" value={String(selectedOrg.coordinators)} />
+                  <InfoTile label="Region" value={selectedOrg.region || "Not provided"} />
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs font-medium text-muted-foreground">Enabled Features</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(selectedOrg.plan ? selectedOrg.plan.split(",").map((item) => item.trim()).filter(Boolean) : ["Custom"]).map((feature) => (
+                      <Badge key={feature} variant="outline">{feature}</Badge>
+                    ))}
+                  </div>
                 </div>
                 <DonutProgress value={selectedOrg.usage} label="Usage" caption="Current tenant resource usage" />
               </>
             ) : (
               <EmptyState icon={Users} title="No organization selected" description="Select an organization after one is approved." />
             )}
-            <form className="grid gap-2" onSubmit={submitDetails}>
+            <form className="grid max-w-xl gap-2" onSubmit={submitDetails}>
               <Input required placeholder="Organization name" value={form.orgName} onChange={(event) => setForm((current) => ({ ...current, orgName: event.target.value }))} />
               <Input required type="email" placeholder="Organization email" value={form.orgEmail} onChange={(event) => setForm((current) => ({ ...current, orgEmail: event.target.value }))} />
               <Input required placeholder="Phone number" value={form.phoneNumber} onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))} />
@@ -673,7 +681,7 @@ function UsersPage({
           <CardDescription>Superadmins must provide an organization id for tenant users.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-3 md:grid-cols-5" onSubmit={createUser}>
+          <form className="grid max-w-5xl gap-3 md:grid-cols-5" onSubmit={createUser}>
             <Input required placeholder="Name" value={name} onChange={(event) => setName(event.target.value)} />
             <Input required type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} />
             <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={organization} onChange={(event) => setOrganization(event.target.value)}>
@@ -789,7 +797,7 @@ function FeaturesPage({
           <CardDescription>Feature keys should be stable API identifiers.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-3 md:grid-cols-[180px_220px_minmax(0,1fr)_160px]" onSubmit={createFeature}>
+          <form className="grid max-w-5xl gap-3 md:grid-cols-[180px_220px_minmax(0,1fr)_160px]" onSubmit={createFeature}>
             <Input required placeholder="key" value={form.key} onChange={(event) => setForm((current) => ({ ...current, key: event.target.value }))} />
             <Input required placeholder="Name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
             <Input required placeholder="Description" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
@@ -814,14 +822,16 @@ function FeaturesPage({
       <Card>
         <CardContent className="space-y-3 p-4 sm:p-5">
           {loading ? <SkeletonRows rows={4} /> : features.length ? features.map((feature) => (
-            <div key={feature._id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_130px_120px_190px] md:items-center">
-              <div>
+            <div key={feature._id} className="grid gap-3 rounded-lg border p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+              <div className="min-w-0">
                 <p className="font-semibold">{feature.name}</p>
-                <p className="text-sm text-muted-foreground">{feature.key} · {feature.description}</p>
+                <p className="break-words text-sm text-muted-foreground">{feature.key} · {feature.description}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge variant={feature.enabledByDefault ? "secondary" : "outline"}>{feature.enabledByDefault ? "Default" : "Optional"}</Badge>
+                  <Badge variant={feature.isActive ? "secondary" : "warning"}>{feature.isActive ? "Active" : "Inactive"}</Badge>
+                </div>
               </div>
-              <Badge variant={feature.enabledByDefault ? "secondary" : "outline"}>{feature.enabledByDefault ? "Default" : "Optional"}</Badge>
-              <Badge variant={feature.isActive ? "secondary" : "warning"}>{feature.isActive ? "Active" : "Inactive"}</Badge>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="flex flex-wrap justify-end gap-2">
                 <Button size="sm" variant="outline" disabled={Boolean(toggling)} onClick={() => toggleFeature(feature, "enabledByDefault")}>
                   {toggling === `${feature._id}:enabledByDefault` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
                   Default
@@ -1308,10 +1318,10 @@ function PlatformSettingsPage({ onAction }: { onAction: (message: string) => voi
       />
       <Card>
         <CardContent className="grid gap-3 p-4 sm:p-5 md:grid-cols-2">
-          <Input defaultValue="support@placeprep.io" />
-          <Input defaultValue="Default Growth Plan" />
-          <Input defaultValue="MFA optional" />
-          <Input defaultValue="Audit retention 365 days" />
+          <Input placeholder="Support email" defaultValue="support@placeprep.io" />
+          <Input placeholder="Default plan" defaultValue="Default Growth Plan" />
+          <Input placeholder="Security policy" defaultValue="MFA optional" />
+          <Input placeholder="Audit retention" defaultValue="Audit retention 365 days" />
         </CardContent>
       </Card>
       <ChangePasswordCard />

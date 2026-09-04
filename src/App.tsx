@@ -4,7 +4,9 @@ import { LandingScreen } from "@/components/layout/landing-screen";
 import { StudentShell } from "@/components/layout/student-shell";
 import { SuperAdminShell } from "@/components/layout/super-admin-shell";
 import { LoginScreen } from "@/components/layout/login-screen";
-import { initialAnnouncements, initialAssessments, initialHomework, initialTasks } from "@/data/student";
+import { adminNavItems } from "@/data/admin";
+import { superAdminNavItems } from "@/data/super-admin";
+import { initialAnnouncements, initialAssessments, initialHomework, initialTasks, navItems } from "@/data/student";
 import { AdminSection } from "@/sections/admin/admin-section";
 import { ActivitiesSection } from "@/sections/activities/activities-section";
 import { AnnouncementsSection } from "@/sections/announcements/announcements-section";
@@ -45,6 +47,22 @@ function pathForRole(role: UserRole) {
   return "/student";
 }
 
+function slugForNav(label: string) {
+  return label.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function navFromPath<T extends string>(basePath: string, labels: T[], fallback: T): T {
+  const segment = window.location.pathname.replace(basePath, "").split("/").filter(Boolean)[0];
+  if (!segment) return fallback;
+  return labels.find((label) => slugForNav(label) === segment) ?? fallback;
+}
+
+function pathForNav(role: UserRole, label: string) {
+  const basePath = pathForRole(role);
+  if (label === "Dashboard") return basePath;
+  return `${basePath}/${slugForNav(label)}`;
+}
+
 function App() {
   const initialRouteRole = roleFromPath();
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getAccessToken()));
@@ -52,9 +70,12 @@ function App() {
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
   const [showRegistration, setShowRegistration] = useState(window.location.pathname === "/register-organization");
   const [showLogin, setShowLogin] = useState(Boolean(initialRouteRole));
-  const [activeNav, setActiveNav] = useState<NavLabel>("Dashboard");
-  const [activeAdminNav, setActiveAdminNav] = useState<AdminNavLabel>("Dashboard");
-  const [activeSuperAdminNav, setActiveSuperAdminNav] = useState<SuperAdminNavLabel>("Dashboard");
+  const [activeNav, setActiveNav] = useState<NavLabel>(() => navFromPath("/student", navItems.map((item) => item.label), "Dashboard"));
+  const [activeAdminNav, setActiveAdminNav] = useState<AdminNavLabel>(() => {
+    const basePath = initialRouteRole === "teacher" ? "/teacher" : "/admin";
+    return navFromPath(basePath, adminNavItems.map((item) => item.label), "Dashboard");
+  });
+  const [activeSuperAdminNav, setActiveSuperAdminNav] = useState<SuperAdminNavLabel>(() => navFromPath("/super-admin", superAdminNavItems.map((item) => item.label), "Dashboard"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [query, setQuery] = useState("");
@@ -78,7 +99,9 @@ function App() {
         setUserRole(appRole);
         setIsLoggedIn(true);
         setShowLogin(false);
-        window.history.replaceState({}, "", pathForRole(appRole));
+        if (roleFromPath() !== appRole) {
+          window.history.replaceState({}, "", pathForRole(appRole));
+        }
       })
       .catch(() => {
         clearAccessToken();
@@ -144,6 +167,21 @@ function App() {
     setActiveAdminNav("Dashboard");
     setActiveSuperAdminNav("Dashboard");
     window.history.pushState({}, "", pathForRole(appRole));
+  }
+
+  function changeStudentNav(nav: NavLabel) {
+    setActiveNav(nav);
+    window.history.pushState({}, "", pathForNav("student", nav));
+  }
+
+  function changeAdminNav(nav: AdminNavLabel) {
+    setActiveAdminNav(nav);
+    window.history.pushState({}, "", pathForNav(userRole === "teacher" ? "teacher" : "admin", nav));
+  }
+
+  function changeSuperAdminNav(nav: SuperAdminNavLabel) {
+    setActiveSuperAdminNav(nav);
+    window.history.pushState({}, "", pathForNav("super-admin", nav));
   }
 
   function logout() {
@@ -227,7 +265,7 @@ function App() {
         activeNav={activeSuperAdminNav}
         mobileMenuOpen={mobileMenuOpen}
         toastMessage={toastMessage}
-        onChangeNav={setActiveSuperAdminNav}
+        onChangeNav={changeSuperAdminNav}
         onCloseMenu={() => setMobileMenuOpen(false)}
         onOpenMenu={() => setMobileMenuOpen(true)}
         onLogout={logout}
@@ -244,7 +282,7 @@ function App() {
         activeNav={activeAdminNav}
         mobileMenuOpen={mobileMenuOpen}
         toastMessage={toastMessage}
-        onChangeNav={setActiveAdminNav}
+        onChangeNav={changeAdminNav}
         onCloseMenu={() => setMobileMenuOpen(false)}
         onOpenMenu={() => setMobileMenuOpen(true)}
         onLogout={logout}
@@ -261,7 +299,7 @@ function App() {
       mobileMenuOpen={mobileMenuOpen}
       sidebarCollapsed={sidebarCollapsed}
       toastMessage={toastMessage}
-      onChangeNav={setActiveNav}
+      onChangeNav={changeStudentNav}
       onCloseMenu={() => setMobileMenuOpen(false)}
       onOpenMenu={() => setMobileMenuOpen(true)}
       onToggleSidebar={() => setSidebarCollapsed((value) => !value)}
