@@ -4,7 +4,6 @@ export type AdminNavLabel =
   | "Dashboard"
   | "Students"
   | "Coordinators"
-  | "Roles and Permissions"
   | "Sections"
   | "Groups"
   | "Tasks"

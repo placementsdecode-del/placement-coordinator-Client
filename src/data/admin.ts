@@ -25,7 +25,6 @@ export const adminNavItems: AdminNavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard },
   { label: "Students", icon: Users },
   { label: "Coordinators", icon: ShieldCheck },
-  { label: "Roles and Permissions", icon: Settings },
   { label: "Sections", icon: BookOpenCheck },
   { label: "Groups", icon: ClipboardList },
   { label: "Tasks", icon: CalendarDays },
