@@ -44,6 +44,7 @@ export type AdminStudentRow = {
   email: string;
   phone: string;
   section: string;
+  sectionId?: string;
   rollNo: string;
   groups: string;
   readiness: number;

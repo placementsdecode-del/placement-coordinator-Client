@@ -28,21 +28,31 @@ function buildApiUrl(path: string) {
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getAccessToken();
-  const isFormData = options.body instanceof FormData;
-  const response = await fetch(buildApiUrl(path), {
-    ...options,
-    headers: {
-      ...(isFormData ? {} : { "Content-Type": "application/json" }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
-
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    throw new ApiError(data?.message || "Request failed", response.status);
+  const headers = new Headers(options.headers);
+  if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
   }
-
-  return data as T;
+  if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (options.signal?.aborted) controller.abort();
+  else options.signal?.addEventListener("abort", abort, { once: true });
+  const timeout = window.setTimeout(abort, 30000);
+  try {
+    const response = await fetch(buildApiUrl(path), { ...options, headers, signal: controller.signal });
+    if (response.status === 204) return undefined as T;
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new ApiError(data?.message || `Request failed (${response.status}). Please try again.`, response.status);
+    }
+    if (data === null) throw new ApiError("The server returned an invalid response. Please try again.", response.status);
+    return data as T;
+  } catch (error) {
+    if (error instanceof ApiError || options.signal?.aborted) throw error;
+    if (controller.signal.aborted) throw new ApiError("The request timed out. Please try again.", 408);
+    throw new ApiError("Unable to reach the server. Check your connection and try again.", 0);
+  } finally {
+    window.clearTimeout(timeout);
+    options.signal?.removeEventListener("abort", abort);
+  }
 }

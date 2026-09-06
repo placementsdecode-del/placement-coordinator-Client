@@ -8,9 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { createFeature as createFeatureRecord, updateFeature } from "@/services/features.service";
-import { syncOrganizationRoles, updateRole } from "@/services/roles.service";
-import { createUser as createUserRecord, updateUser } from "@/services/users.service";
+import { createFeature as createFeatureRecord, updateFeature } from "@/services/features.api.service";
+import { syncOrganizationRoles, updateRole } from "@/services/roles.api.service";
+import { createUser as createUserRecord, updateUser } from "@/services/users.api.service";
 import { organizationLabel } from "@/sections/super-admin/super-admin-mappers";
 import type { AcceptedOrganization, ApiRole, ApiUser, Feature } from "@/types/api";
 

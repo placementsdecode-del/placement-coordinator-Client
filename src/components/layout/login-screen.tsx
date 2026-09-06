@@ -55,7 +55,7 @@ export function LoginScreen({
           </div>
           <div className="grid max-w-2xl gap-3 sm:grid-cols-3">
             {["40+ tech study guides", "Career roadmaps", "Coding & self-assessments"].map((item) => (
-              <div key={item} className="rounded-lg border bg-white/80 p-4 text-sm font-medium shadow-soft">
+              <div key={item} className="rounded-lg border bg-white p-4 text-sm font-medium shadow-soft">
                 {item}
               </div>
             ))}

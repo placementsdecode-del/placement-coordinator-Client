@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Code2, Play, RotateCcw, Send, TerminalSquare } from "lucide-react";
+import { Play, RotateCcw, Send, TerminalSquare } from "lucide-react";
 import { DonutProgress } from "@/components/common/donut-progress";
 import { SectionIntro } from "@/components/common/section-intro";
 import { Badge } from "@/components/ui/badge";

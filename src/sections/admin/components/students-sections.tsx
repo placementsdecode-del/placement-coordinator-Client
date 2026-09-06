@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Eye, Layers, Plus, UserPlus, Users } from "lucide-react";
 import { InfoTile, ReadinessPill } from "@/components/common/admin-primitives";
 import { DonutProgress } from "@/components/common/donut-progress";
@@ -19,9 +19,10 @@ export function StudentDetail({
 }: {
   student: AdminStudentRow | null;
   sections: SectionRow[];
-  onMoveStudent: (studentId: string, sectionName: string) => Promise<void>;
+  onMoveStudent: (studentId: string, sectionId: string) => Promise<void>;
 }) {
   const [moving, setMoving] = useState(false);
+  const [error, setError] = useState("");
 
   return (
     <Card>
@@ -72,21 +73,28 @@ export function StudentDetail({
           <label className="text-sm font-medium">Move to section</label>
           <select
             className="h-11 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
-            value={student.section}
+            aria-label="Student section"
+            value={student.sectionId || ""}
             disabled={moving}
             onChange={async (event) => {
               setMoving(true);
+              setError("");
               try {
                 await onMoveStudent(student.id, event.target.value);
+              } catch (error) {
+                setError(error instanceof Error ? error.message : "Unable to change section.");
               } finally {
                 setMoving(false);
               }
             }}
           >
+            <option value="">Unassigned — remove from section</option>
             {sections.map((section) => (
-              <option key={section.id}>{section.name}</option>
+              <option key={section.id} value={section.id} disabled={section.status !== "Active"}>{section.name} · {section.code}</option>
             ))}
           </select>
+          {moving ? <p role="status" className="text-sm text-primary">Saving assignment…</p> : null}
+          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         </div> : null}
       </CardContent>
     </Card>
@@ -94,6 +102,7 @@ export function StudentDetail({
 }
 
 export function StudentsAdmin({
+  canManage = true,
   sections,
   students,
   selectedStudent,
@@ -116,28 +125,29 @@ export function StudentsAdmin({
     section?: string;
     password?: string;
   }) => Promise<void>;
-  onMoveStudent: (studentId: string, sectionName: string) => Promise<void>;
+  onMoveStudent: (studentId: string, sectionId: string) => Promise<void>;
   loading: boolean;
+  canManage?: boolean;
 }) {
-  const [sectionFilter, setSectionFilter] = useState(sections[0]?.name ?? "");
+  const [sectionFilter, setSectionFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
-  const filteredStudents = students.filter((student) => student.section === sectionFilter);
-
-  useEffect(() => {
-    setSectionFilter((current) => current || sections[0]?.name || "");
-  }, [sections]);
+  const [search, setSearch] = useState("");
+  const filteredStudents = students.filter((student) =>
+    (sectionFilter === "all" || (student.sectionId || "unassigned") === sectionFilter) &&
+    `${student.name} ${student.email} ${student.rollNo}`.toLowerCase().includes(search.toLowerCase()),
+  );
 
   return (
     <>
       <SectionIntro
         eyebrow="Students"
-        title="Students are managed through sections."
+        title="Students"
         description="Filter by section, open a student profile, review progress, and move students between sections."
         action={
-          <Button onClick={() => setShowCreate((value) => !value)}>
+          canManage ? <Button onClick={() => setShowCreate((value) => !value)}>
             <UserPlus className="h-4 w-4" />
             Add Student
-          </Button>
+          </Button> : null
         }
       />
       {showCreate ? <CreateStudentForm sections={sections} onCreateStudent={onCreateStudent} /> : null}
@@ -145,20 +155,24 @@ export function StudentsAdmin({
         <Card>
           <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between md:space-y-0">
             <div>
-              <CardTitle>Students By Section</CardTitle>
+              <CardTitle>Student directory</CardTitle>
               <CardDescription>{filteredStudents.length} students in selected section.</CardDescription>
             </div>
             <select
               className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm md:w-72"
+              aria-label="Filter by section"
               value={sectionFilter}
               onChange={(event) => setSectionFilter(event.target.value)}
             >
+              <option value="all">All students</option>
+              <option value="unassigned">Unassigned</option>
               {sections.map((section) => (
-                <option key={section.id}>{section.name}</option>
+                <option key={section.id} value={section.id}>{section.name} · {section.code}</option>
               ))}
             </select>
           </CardHeader>
           <CardContent className="space-y-3">
+            <Input aria-label="Search students" placeholder="Search name, email or registration number" value={search} onChange={(event) => setSearch(event.target.value)} />
             {loading ? <SkeletonRows rows={4} /> : filteredStudents.length ? filteredStudents.map((student) => (
               <button
                 key={student.id}
@@ -175,7 +189,7 @@ export function StudentsAdmin({
                 <Badge variant={student.pending > 4 ? "danger" : "outline"}>{student.pending} pending</Badge>
               </button>
             )) : (
-              <EmptyState icon={Users} title="No students yet" description="Add students after creating or selecting a section." />
+              <EmptyState icon={Users} title={students.length ? "No matching students" : "No students yet"} description={students.length ? "Try a different search or section filter." : "Add your first student and assign a section when ready."} />
             )}
           </CardContent>
         </Card>
@@ -187,11 +201,13 @@ export function StudentsAdmin({
 
 
 export function SectionsAdmin({
+  canManage = true,
   sections,
   students,
   selectedSection,
   selectedStudent,
   onCreateSection,
+  onUpdateSection,
   onSelectSection,
   onSelectStudent,
   onMoveStudent,
@@ -203,9 +219,10 @@ export function SectionsAdmin({
   selectedSection: SectionRow | null;
   selectedStudent: AdminStudentRow | null;
   onCreateSection: (section: SectionRow) => Promise<void>;
+  onUpdateSection: (section: SectionRow) => Promise<void>;
   onSelectSection: (sectionId: string) => void;
   onSelectStudent: (studentId: string) => void;
-  onMoveStudent: (studentId: string, sectionName: string) => Promise<void>;
+  onMoveStudent: (studentId: string, sectionId: string) => Promise<void>;
   onCreateStudent: (user: {
     name: string;
     email: string;
@@ -217,22 +234,27 @@ export function SectionsAdmin({
     password?: string;
   }) => Promise<void>;
   loading: boolean;
+  canManage?: boolean;
 }) {
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [assignId, setAssignId] = useState("");
+  const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState("");
   const [showStudentForm, setShowStudentForm] = useState(false);
-  const sectionStudents = selectedSection ? students.filter((student) => student.section === selectedSection.name) : [];
+  const sectionStudents = selectedSection ? students.filter((student) => student.sectionId === selectedSection.id) : [];
 
   return (
     <>
       <SectionIntro
         eyebrow="Sections"
-        title="Create sections and manage students inside each section."
+        title="Sections"
         description="Open a section to see all students belonging to it, then open student progress or move students between sections."
         action={
-          <Button onClick={() => setShowForm((value) => !value)}>
+          canManage ? <Button onClick={() => setShowForm((value) => !value)}>
             <Plus className="h-4 w-4" />
             New Section
-          </Button>
+          </Button> : null
         }
       />
       {showForm ? <CreateSectionForm onCreateSection={onCreateSection} /> : null}
@@ -247,7 +269,7 @@ export function SectionsAdmin({
               <button
                 key={section.id}
                 className={`w-full rounded-lg border p-3 text-left ${selectedSection?.id === section.id ? "border-primary bg-primary/5" : "bg-white"}`}
-                onClick={() => onSelectSection(section.id)}
+                onClick={() => { onSelectSection(section.id); setEditing(false); setAssignId(""); setAssignError(""); }}
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-semibold">{section.name}</p>
@@ -255,7 +277,7 @@ export function SectionsAdmin({
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{section.description}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Badge variant="outline">{students.filter((student) => student.section === section.name).length} students</Badge>
+                  <Badge variant="outline">{students.filter((student) => student.sectionId === section.id).length} students</Badge>
                   <Badge variant="outline">{section.code}</Badge>
                   <Badge variant="outline">{section.coordinator}</Badge>
                 </div>
@@ -276,14 +298,35 @@ export function SectionsAdmin({
               <InfoTile label="Batch" value={selectedSection.batch} />
               <InfoTile label="Students" value={String(sectionStudents.length)} />
             </div> : null}
-            {selectedSection ? (
-              <div className="flex justify-end">
+            {selectedSection && canManage ? (
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditing((value) => !value)}>Edit section</Button>
                 <Button variant="outline" onClick={() => setShowStudentForm((value) => !value)}>
                   <UserPlus className="h-4 w-4" />
                   Add Student
                 </Button>
               </div>
             ) : null}
+            {editing && selectedSection ? <CreateSectionForm key={selectedSection.id} initialSection={selectedSection} onCreateSection={async (section) => { await onUpdateSection(section); setEditing(false); }} /> : null}
+            {selectedSection ? <form className="space-y-2 rounded-lg border bg-muted p-4" onSubmit={async (event) => {
+              event.preventDefault();
+              if (!assignId) return;
+              setAssigning(true); setAssignError("");
+              try { await onMoveStudent(assignId, selectedSection.id); setAssignId(""); }
+              catch (error) { setAssignError(error instanceof Error ? error.message : "Unable to assign student."); }
+              finally { setAssigning(false); }
+            }}>
+              <label htmlFor="assign-student" className="block text-sm font-semibold">Assign an existing student</label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <select id="assign-student" className="h-11 min-h-11 min-w-0 sm:flex-1 rounded-md border bg-white px-3 text-sm" value={assignId} onChange={(event) => setAssignId(event.target.value)} disabled={assigning || selectedSection.status !== "Active"}>
+                  <option value="">Select student</option>
+                  {students.filter((student) => student.sectionId !== selectedSection.id).map((student) => <option key={student.id} value={student.id}>{student.name} · {student.rollNo} · {student.section}</option>)}
+                </select>
+                <Button type="submit" disabled={!assignId || assigning || selectedSection.status !== "Active"}>{assigning ? "Assigning…" : "Assign student"}</Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Assigning moves the student from their current section. To remove a student, open their details and select Unassigned.</p>
+              {assignError ? <p role="alert" className="text-sm text-destructive">{assignError}</p> : null}
+            </form> : null}
             {showStudentForm && selectedSection ? (
               <CreateStudentForm sections={sections} initialSectionId={selectedSection.id} embedded onCreateStudent={onCreateStudent} />
             ) : null}

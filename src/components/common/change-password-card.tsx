@@ -3,7 +3,7 @@ import { LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { changePassword } from "@/services/auth.service";
+import { changePassword } from "@/services/auth.api.service";
 
 export function ChangePasswordCard({ mustChangePassword = false }: { mustChangePassword?: boolean }) {
   const [currentPassword, setCurrentPassword] = useState("");

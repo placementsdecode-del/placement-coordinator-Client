@@ -7,6 +7,14 @@ import tseslint from "typescript-eslint";
 export default tseslint.config(
   { ignores: ["dist"] },
   {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/services/**", "src/constants/api.ts", "src/data/commit-history.ts"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [{ group: ["@/constants/api"], message: "Endpoint definitions belong in domain API services." }], paths: [{ name: "@/services/api-client", importNames: ["apiFetch"], message: "Call a domain API service instead." }] }],
+      "no-restricted-syntax": ["error", { selector: "CallExpression[callee.name=fetch]", message: "Network requests must use the shared API client through a domain service." }],
+    },
+  },
+  {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
     languageOptions: {

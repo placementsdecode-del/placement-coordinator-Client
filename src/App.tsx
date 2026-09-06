@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { LandingScreen } from "@/components/layout/landing-screen";
 import { StudentShell } from "@/components/layout/student-shell";
@@ -7,29 +7,32 @@ import { LoginScreen } from "@/components/layout/login-screen";
 import { adminNavItems } from "@/data/admin";
 import { superAdminNavItems } from "@/data/super-admin";
 import { initialAnnouncements, initialAssessments, initialHomework, initialTasks, navItems } from "@/data/student";
-import { AdminSection } from "@/sections/admin/admin-section";
-import { ActivitiesSection } from "@/sections/activities/activities-section";
-import { AnnouncementsSection } from "@/sections/announcements/announcements-section";
-import { AssessmentsSection } from "@/sections/assessments/assessments-section";
-import { CareerRoadmapsSection } from "@/sections/career-roadmaps/career-roadmaps-section";
-import { CodingPracticeSection } from "@/sections/coding-practice/coding-practice-section";
-import { DailyTasksSection } from "@/sections/daily-tasks/daily-tasks-section";
-import { DashboardSection } from "@/sections/dashboard/dashboard-section";
-import { HomeworkSection } from "@/sections/homework/homework-section";
-import { PreparationProgressSection } from "@/sections/preparation-progress/preparation-progress-section";
-import { ProfileSection } from "@/sections/profile/profile-section";
-import { OrganizationRegistrationPage } from "@/pages/public/organization-registration";
-import { ResultsSection } from "@/sections/results/results-section";
-import { SelfAssessmentSection } from "@/sections/self-assessment/self-assessment-section";
-import { StudyMaterialsSection } from "@/sections/study-materials/study-materials-section";
-import { SuperAdminSection } from "@/sections/super-admin/super-admin-section";
 import type { AdminNavLabel } from "@/types/admin";
 import { clearAccessToken, getAccessToken, setAccessToken } from "@/services/api-client";
-import { getCurrentUser, login } from "@/services/auth.service";
+import { getCurrentUser, login } from "@/services/auth.api.service";
 import type { SessionUser, UserRole } from "@/types/auth";
 import { toAppRole } from "@/types/auth";
 import type { SuperAdminNavLabel } from "@/types/super-admin";
 import type { AnnouncementItem, AssessmentItem, HomeworkItem, NavLabel, TaskItem } from "@/types/student";
+
+import { PageSkeleton } from "@/components/common/loading-state";
+
+const AdminSection = lazy(() => import("@/sections/admin/admin-section").then((module) => ({ default: module.AdminSection })));
+const ActivitiesSection = lazy(() => import("@/sections/activities/activities-section").then((module) => ({ default: module.ActivitiesSection })));
+const AnnouncementsSection = lazy(() => import("@/sections/announcements/announcements-section").then((module) => ({ default: module.AnnouncementsSection })));
+const AssessmentsSection = lazy(() => import("@/sections/assessments/assessments-section").then((module) => ({ default: module.AssessmentsSection })));
+const CareerRoadmapsSection = lazy(() => import("@/sections/career-roadmaps/career-roadmaps-section").then((module) => ({ default: module.CareerRoadmapsSection })));
+const CodingPracticeSection = lazy(() => import("@/sections/coding-practice/coding-practice-section").then((module) => ({ default: module.CodingPracticeSection })));
+const DailyTasksSection = lazy(() => import("@/sections/daily-tasks/daily-tasks-section").then((module) => ({ default: module.DailyTasksSection })));
+const DashboardSection = lazy(() => import("@/sections/dashboard/dashboard-section").then((module) => ({ default: module.DashboardSection })));
+const HomeworkSection = lazy(() => import("@/sections/homework/homework-section").then((module) => ({ default: module.HomeworkSection })));
+const PreparationProgressSection = lazy(() => import("@/sections/preparation-progress/preparation-progress-section").then((module) => ({ default: module.PreparationProgressSection })));
+const ProfileSection = lazy(() => import("@/sections/profile/profile-section").then((module) => ({ default: module.ProfileSection })));
+const OrganizationRegistrationPage = lazy(() => import("@/pages/public/organization-registration").then((module) => ({ default: module.OrganizationRegistrationPage })));
+const ResultsSection = lazy(() => import("@/sections/results/results-section").then((module) => ({ default: module.ResultsSection })));
+const SelfAssessmentSection = lazy(() => import("@/sections/self-assessment/self-assessment-section").then((module) => ({ default: module.SelfAssessmentSection })));
+const StudyMaterialsSection = lazy(() => import("@/sections/study-materials/study-materials-section").then((module) => ({ default: module.StudyMaterialsSection })));
+const SuperAdminSection = lazy(() => import("@/sections/super-admin/super-admin-section").then((module) => ({ default: module.SuperAdminSection })));
 
 function roleFromPath(): UserRole | null {
   const path = window.location.pathname;
@@ -65,6 +68,7 @@ function pathForNav(role: UserRole, label: string) {
 
 function App() {
   const initialRouteRole = roleFromPath();
+  const [sessionLoading, setSessionLoading] = useState(Boolean(getAccessToken()));
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getAccessToken()));
   const [userRole, setUserRole] = useState<UserRole>(initialRouteRole ?? "student");
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
@@ -107,7 +111,8 @@ function App() {
         clearAccessToken();
         setIsLoggedIn(false);
         setCurrentUser(null);
-      });
+      })
+      .finally(() => setSessionLoading(false));
   }, []);
 
   function handleTaskAction(title: string) {
@@ -139,19 +144,6 @@ function App() {
   function handleMarkRead() {
     setAnnouncementItems((items) => items.map((item) => ({ ...item, read: true })));
     showToast("All announcements marked read.");
-  }
-
-  function enterWorkspace(role: UserRole = "student") {
-    clearAccessToken();
-    setCurrentUser(null);
-    setUserRole(role);
-    setIsLoggedIn(true);
-    setShowRegistration(false);
-    setMobileMenuOpen(false);
-    setActiveNav("Dashboard");
-    setActiveAdminNav("Dashboard");
-    setActiveSuperAdminNav("Dashboard");
-    window.history.pushState({}, "", pathForRole(role));
   }
 
   async function handleLogin(email: string, password: string) {
@@ -231,6 +223,8 @@ function App() {
     }
   }
 
+  if (sessionLoading) return <div className="mx-auto max-w-7xl p-6"><PageSkeleton label="Restoring your session" /></div>;
+
   if (!isLoggedIn) {
     if (showRegistration) {
       return (
@@ -271,7 +265,7 @@ function App() {
         onLogout={logout}
         onDismissToast={() => setToastMessage("")}
       >
-        <SuperAdminSection activeNav={activeSuperAdminNav} onAction={showToast} />
+        <Suspense fallback={<PageSkeleton />}><SuperAdminSection activeNav={activeSuperAdminNav} onAction={showToast} /></Suspense>
       </SuperAdminShell>
     );
   }
@@ -288,7 +282,7 @@ function App() {
         onLogout={logout}
         onDismissToast={() => setToastMessage("")}
       >
-        <AdminSection activeNav={activeAdminNav} currentUser={currentUser} onAction={showToast} />
+        <Suspense fallback={<PageSkeleton />}><AdminSection activeNav={activeAdminNav} currentUser={currentUser} onAction={showToast} /></Suspense>
       </AdminShell>
     );
   }
@@ -306,9 +300,11 @@ function App() {
       onLogout={logout}
       onDismissToast={() => setToastMessage("")}
     >
-      {renderSection()}
+      <Suspense key={activeNav} fallback={<PageSkeleton label={`Loading ${activeNav}`} />}>{renderSection()}</Suspense>
     </StudentShell>
   );
 }
 
-export default App;
+export default function Application() {
+  return <Suspense fallback={<div className="mx-auto max-w-7xl p-6"><PageSkeleton /></div>}><App /></Suspense>;
+}

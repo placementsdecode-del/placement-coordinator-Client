@@ -248,7 +248,7 @@ function RoadmapNodePage({ track, node, status, onAction, onComplete, onBack }: 
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm"><span><strong>4-6 hours</strong> estimated</span><span>Prerequisite: <strong>{previous?.label ?? "None"}</strong></span><span><strong>{concepts.length}</strong> concepts</span></div>
       </header>
 
-      <nav className="sticky top-[61px] z-10 flex gap-1 overflow-x-auto border-b bg-white/95 px-4 py-2 backdrop-blur sm:px-6">
+      <nav className="sticky top-[61px] z-10 flex gap-1 overflow-x-auto border-b bg-white px-4 py-2 sm:px-6">
         {(["Learn", "Practice", "Interview", "Project", "Revision"] as DetailTab[]).map((item) => <button key={item} className={cn("h-9 shrink-0 rounded-md px-3 text-sm font-medium", tab === item ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")} onClick={() => setTab(item)}>{item}</button>)}
       </nav>
 

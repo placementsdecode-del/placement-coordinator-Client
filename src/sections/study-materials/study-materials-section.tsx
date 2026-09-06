@@ -1,3 +1,4 @@
+import { PageSkeleton } from "@/components/common/loading-state";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -85,7 +86,7 @@ export function StudyMaterialsSection({ onAction }: { onAction: (message: string
   }
 
   if (chapterOpen) {
-    if (guideLoading) return <GuideStatus title="Loading study guide" description={`Reading ${selectedTech} content from JSON...`} loading />;
+    if (guideLoading) return <PageSkeleton label={`Loading ${selectedTech} study guide`} />;
     if (guideError || !guide) return <GuideStatus title="Guide unavailable" description={guideError ?? `The ${selectedTech} guide could not be loaded.`} onBack={() => setChapterOpen(false)} />;
     return (
       <ChapterPage
@@ -304,7 +305,7 @@ function ChapterPage({ activeTab, guide, activeStage, completedTopics, onToggleC
         </div>
       </header>
 
-      <nav className="sticky top-[61px] z-10 flex gap-1 overflow-x-auto border-b bg-white/95 px-4 py-2 backdrop-blur sm:px-6">
+      <nav className="sticky top-[61px] z-10 flex gap-1 overflow-x-auto border-b bg-white px-4 py-2 sm:px-6">
         {tabs.map((tab) => <button key={tab} className={cn("h-9 shrink-0 rounded-md px-3 text-sm font-medium", activeTab === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")} onClick={() => onChangeTab(tab)}>{tab}</button>)}
       </nav>
 

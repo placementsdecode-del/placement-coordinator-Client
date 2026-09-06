@@ -42,7 +42,7 @@ export function AdminShell({
       >
         <div className="flex h-16 items-center justify-between border-b px-5">
           <BrandLogo subtitle="Admin" />
-          <Button className="lg:hidden" variant="ghost" size="icon" onClick={onCloseMenu}>
+          <Button className="lg:hidden" variant="ghost" size="icon" onClick={onCloseMenu} aria-label="Close navigation">
             <X className="h-5 w-5" />
           </Button>
         </div>
@@ -54,6 +54,7 @@ export function AdminShell({
           {adminNavItems.map((item) => (
             <button
               key={item.label}
+              aria-current={activeNav === item.label ? "page" : undefined}
               className={cn(
                 "flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-medium transition-colors",
                 activeNav === item.label ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
@@ -71,9 +72,9 @@ export function AdminShell({
       </aside>
 
       <div className="lg:pl-72">
-        <header className="fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between border-b bg-white/90 px-4 backdrop-blur md:px-6 lg:left-72">
+        <header className="fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between border-b bg-white px-4 md:px-6 lg:left-72">
           <div className="flex min-w-0 items-center gap-3">
-            <Button className="lg:hidden" variant="outline" size="icon" onClick={onOpenMenu}>
+            <Button className="lg:hidden" variant="outline" size="icon" onClick={onOpenMenu} aria-label="Open navigation">
               <Menu className="h-5 w-5" />
             </Button>
             <div className="min-w-0">

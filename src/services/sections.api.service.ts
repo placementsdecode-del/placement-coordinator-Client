@@ -37,3 +37,7 @@ export function assignStudentToSection(sectionId: string, studentId: string) {
     method: "POST",
   });
 }
+
+export function removeStudentFromSection(sectionId: string, studentId: string) {
+  return apiFetch<{ message: string }>(API_ENDPOINTS.sections.assignStudent(sectionId, studentId), { method: "DELETE" });
+}

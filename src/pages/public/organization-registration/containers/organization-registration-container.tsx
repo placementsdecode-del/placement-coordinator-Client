@@ -1,19 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { SkeletonRows, LoadError } from "@/components/common/loading-state";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FeatureChecklist } from "@/pages/public/organization-registration/components/feature-checklist";
 import { RegistrationForm } from "@/pages/public/organization-registration/components/registration-form";
-import {
-  FALLBACK_REGISTRATION_FEATURES,
-  INITIAL_ORGANIZATION_REGISTRATION_FORM,
-} from "@/pages/public/organization-registration/organization-registration.constants";
+import { INITIAL_ORGANIZATION_REGISTRATION_FORM } from "@/pages/public/organization-registration/organization-registration.constants";
 import type { OrganizationRegistrationFormValues } from "@/pages/public/organization-registration/organization-registration.types";
-import { listFeatures } from "@/services/features.service";
-import { createOrganizationRegistration } from "@/services/organization-registrations.service";
+import { listFeatures } from "@/services/features.api.service";
+import { createOrganizationRegistration } from "@/services/organization-registrations.api.service";
 import type { Feature } from "@/types/api";
 
 export function OrganizationRegistrationContainer() {
-  const [features, setFeatures] = useState<Feature[]>(FALLBACK_REGISTRATION_FEATURES);
+  const [featuresLoading, setFeaturesLoading] = useState(true);
+  const [featuresError, setFeaturesError] = useState("");
+  const [features, setFeatures] = useState<Feature[]>([]);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>(
-    FALLBACK_REGISTRATION_FEATURES.filter((feature) => feature.enabledByDefault).map((feature) => feature._id),
+    [],
   );
   const [form, setForm] = useState<OrganizationRegistrationFormValues>(INITIAL_ORGANIZATION_REGISTRATION_FORM);
   const [error, setError] = useState("");
@@ -22,17 +22,17 @@ export function OrganizationRegistrationContainer() {
 
   const activeFeatures = useMemo(() => features.filter((feature) => feature.isActive), [features]);
 
-  useEffect(() => {
-    listFeatures()
-      .then((items) => {
-        if (!items.length) return;
-        setFeatures(items);
-        setSelectedFeatures(items.filter((feature) => feature.enabledByDefault).map((feature) => feature._id));
-      })
-      .catch(() => {
-        setFeatures(FALLBACK_REGISTRATION_FEATURES);
-      });
+  const loadFeatures = useCallback(async () => {
+    setFeaturesLoading(true); setFeaturesError("");
+    try {
+      const items = await listFeatures();
+      setFeatures(items);
+      setSelectedFeatures(items.filter((feature) => feature.enabledByDefault).map((feature) => feature._id));
+    } catch (error) {
+      setFeaturesError(error instanceof Error ? error.message : "Unable to load features.");
+    } finally { setFeaturesLoading(false); }
   }, []);
+  useEffect(() => { void loadFeatures(); }, [loadFeatures]);
 
   function updateField(field: keyof OrganizationRegistrationFormValues, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -72,12 +72,12 @@ export function OrganizationRegistrationContainer() {
       <RegistrationForm
         error={error}
         form={form}
-        isSubmitting={isSubmitting}
+        isSubmitting={isSubmitting || featuresLoading || Boolean(featuresError)}
         success={success}
         onSubmit={submitRegistration}
         onUpdateField={updateField}
       />
-      <FeatureChecklist features={activeFeatures} selectedFeatureIds={selectedFeatures} onChange={setSelectedFeatures} />
+      {featuresLoading ? <SkeletonRows rows={6} /> : featuresError ? <LoadError message={featuresError} onRetry={() => void loadFeatures()} /> : <FeatureChecklist features={activeFeatures} selectedFeatureIds={selectedFeatures} onChange={setSelectedFeatures} />}
     </section>
   );
 }

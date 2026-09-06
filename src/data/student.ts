@@ -1,23 +1,4 @@
-import {
-  Activity,
-  Bell,
-  BookOpenCheck,
-  CalendarDays,
-  CheckCircle2,
-  ClipboardCheck,
-  Clock3,
-  Code2,
-  Compass,
-  FileText,
-  Library,
-  LayoutDashboard,
-  LineChart,
-  ListChecks,
-  Sparkles,
-  Star,
-  Trophy,
-  UserRound,
-} from "lucide-react";
+import { Activity, Bell, BookOpenCheck, CalendarDays, ClipboardCheck, Code2, Compass, Library, LayoutDashboard, LineChart, ListChecks, Trophy, UserRound } from "lucide-react";
 import type {
   ActivityItem,
   AnnouncementItem,

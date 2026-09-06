@@ -75,7 +75,7 @@ export function AdminDashboard({
                     <Badge variant={section.status === "Active" ? "secondary" : "warning"}>{section.status}</Badge>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {students.filter((student) => student.section === section.name).length} students · {section.coordinator}
+                    {students.filter((student) => student.sectionId === section.id).length} students · {section.coordinator}
                   </p>
                 </div>
                 <DonutProgress value={section.readiness} size="sm" className="justify-self-start sm:justify-self-end" />

@@ -1,47 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  BarChart3,
-  ClipboardList,
-  Eye,
-  FileText,
-  Layers,
-  LoaderCircle,
-  Plus,
-  Send,
-  ShieldCheck,
-  UserPlus,
-  Users,
-} from "lucide-react";
-import { ChangePasswordCard } from "@/components/common/change-password-card";
-import { ApiNotice, InfoTile, ReadinessPill } from "@/components/common/admin-primitives";
-import { DonutProgress } from "@/components/common/donut-progress";
-import { EmptyState } from "@/components/common/empty-state";
-import { FieldError, isValidEmail } from "@/components/common/form-validation";
-import { SkeletonRows } from "@/components/common/loading-state";
-import { SectionIntro } from "@/components/common/section-intro";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import {
-  adminAssessments,
-  adminCoordinators,
-  adminSections,
-  adminStudents,
-  adminTasks,
-  coordinatorRoles,
-} from "@/data/admin";
-import { listPermissions, listRoles, syncOrganizationRoles, updateRole } from "@/services/roles.service";
-import { createAssessment as createAssessmentRecord, listAssessments, validateAssessment } from "@/services/assessments.service";
-import { assignStudentToSection, createSection as createSectionRecord, listSections, updateSection } from "@/services/sections.service";
-import { createUser, listUsers } from "@/services/users.service";
+
+import { PageSkeleton, LoadError } from "@/components/common/loading-state";
+
+import { adminAssessments, adminCoordinators, adminTasks, coordinatorRoles } from "@/data/admin";
+import { listPermissions, listRoles, syncOrganizationRoles, updateRole } from "@/services/roles.api.service";
+import { createAssessment as createAssessmentRecord, listAssessments, validateAssessment } from "@/services/assessments.api.service";
+import { assignStudentToSection, removeStudentFromSection, createSection as createSectionRecord, listSections, updateSection } from "@/services/sections.api.service";
+import { createUser, listUsers } from "@/services/users.api.service";
 import { getOrganizationId, mapAssessment, mapSection, mapStudentUser } from "@/sections/admin/admin-mappers";
 import { AdminDashboard } from "@/sections/admin/components/admin-dashboard";
 import { CoordinatorsAdmin } from "@/sections/admin/components/coordinators-page";
 import { AnnouncementsAdmin, GroupsAdmin, ReportsAdmin, SettingsAdmin } from "@/sections/admin/components/misc-pages";
 import { AssessmentsAdmin, TasksAdmin } from "@/sections/admin/components/tasks-assessments";
 import { SectionsAdmin, StudentsAdmin } from "@/sections/admin/components/students-sections";
-import type { ApiAssessment, ApiAssessmentQuestion, ApiRole, ApiSection, ApiUser } from "@/types/api";
+import type { ApiAssessmentQuestion, ApiRole, ApiSection, ApiUser } from "@/types/api";
 import type {
   AdminAssessment,
   AdminNavLabel,
@@ -62,8 +34,8 @@ export function AdminSection({
   currentUser: SessionUser | null;
   onAction: (message: string) => void;
 }) {
-  const [sections, setSections] = useState<SectionRow[]>(adminSections);
-  const [students, setStudents] = useState<AdminStudentRow[]>(adminStudents);
+  const [sections, setSections] = useState<SectionRow[]>([]);
+  const [students, setStudents] = useState<AdminStudentRow[]>([]);
   const [coordinators, setCoordinators] = useState<CoordinatorRow[]>(adminCoordinators);
   const [organizationUsers, setOrganizationUsers] = useState<ApiUser[]>([]);
   const [apiRoles, setApiRoles] = useState<ApiRole[]>([]);
@@ -72,10 +44,11 @@ export function AdminSection({
   const [tasks, setTasks] = useState<AdminTask[]>(adminTasks);
   const [assessments, setAssessments] = useState<AdminAssessment[]>(adminAssessments);
   const [apiSections, setApiSections] = useState<ApiSection[]>([]);
-  const [apiAssessments, setApiAssessments] = useState<ApiAssessment[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [workLoading, setWorkLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const [usersError, setUsersError] = useState("");
+  const [workError, setWorkError] = useState("");
+  const loadError = [usersError, workError].filter(Boolean).join(" ");
   const [selectedSectionId, setSelectedSectionId] = useState(sections[2]?.id ?? sections[0]?.id);
   const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id ?? "");
 
@@ -88,23 +61,23 @@ export function AdminSection({
     try {
       const [users, roleRows, permissionRows] = await Promise.all([
         listUsers(organizationId),
-        listRoles(organizationId),
-        listPermissions(),
+        currentUser?.role === "teacher" ? Promise.resolve([]) : listRoles(organizationId),
+        currentUser?.role === "teacher" ? Promise.resolve([]) : listPermissions(),
       ]);
       setOrganizationUsers(users);
       setApiRoles(roleRows);
       setApiPermissions(permissionRows);
-      setLoadError("");
+      setUsersError("");
     } catch {
       setOrganizationUsers([]);
       setStudents([]);
       setApiRoles([]);
       setApiPermissions([]);
-      setLoadError("Unable to load organization users.");
+      setUsersError("Unable to load organization users.");
     } finally {
       setUsersLoading(false);
     }
-  }, [currentUser?.organization]);
+  }, [currentUser?.organization, currentUser?.role]);
 
   useEffect(() => {
     refreshOrganizationUsers();
@@ -129,15 +102,13 @@ export function AdminSection({
       ]);
       setApiSections(sectionRows);
       setSections(sectionRows.map(mapSection));
-      setApiAssessments(assessmentRows);
       setAssessments(assessmentRows.map(mapAssessment));
-      setLoadError("");
+      setWorkError("");
     } catch {
       setApiSections([]);
       setSections([]);
-      setApiAssessments([]);
       setAssessments([]);
-      setLoadError("Unable to load sections or assessments.");
+      setWorkError("Unable to load sections or assessments.");
     } finally {
       setWorkLoading(false);
     }
@@ -149,39 +120,47 @@ export function AdminSection({
 
   async function createSection(section: SectionRow) {
     const organizationId = getOrganizationId(currentUser?.organization);
-    try {
-      const response = await createSectionRecord({
-        organization: organizationId,
-        name: section.name,
-        code: section.code,
-        department: section.department,
-        batch: section.batch,
-        academicYear: section.academicYear,
-        description: section.description,
-        status: "active",
-      });
-      await refreshOrganizationWork();
-      setSelectedSectionId(response.section._id);
-      onAction(response.message || "Section created.");
-    } catch (error) {
-      setSections((items) => [section, ...items]);
-      setSelectedSectionId(section.id);
-      onAction(error instanceof Error ? error.message : "Section created locally only.");
-    }
+    const response = await createSectionRecord({
+      organization: organizationId,
+      name: section.name,
+      code: section.code,
+      department: section.department,
+      batch: section.batch,
+      academicYear: section.academicYear,
+      description: section.description,
+      status: section.status === "Active" ? "active" : "inactive",
+    });
+    await refreshOrganizationWork();
+    setSelectedSectionId(response.section._id);
+    onAction(response.message || "Section created.");
   }
 
-  async function moveStudent(studentId: string, sectionName: string) {
-    const apiSection = apiSections.find((section) => section.name === sectionName);
-    try {
-      if (apiSection) {
-        await assignStudentToSection(apiSection._id, studentId);
-        await refreshOrganizationUsers();
-      }
-      setStudents((items) => items.map((student) => (student.id === studentId ? { ...student, section: sectionName } : student)));
-      onAction("Student moved to another section.");
-    } catch (error) {
-      onAction(error instanceof Error ? error.message : "Student move failed.");
+
+  async function moveStudent(studentId: string, sectionId: string) {
+    const student = students.find((item) => item.id === studentId);
+    if (!student) throw new Error("Student not found. Refresh and try again.");
+    if (sectionId) {
+      await assignStudentToSection(sectionId, studentId);
+    } else if (student.sectionId) {
+      await removeStudentFromSection(student.sectionId, studentId);
+    } else {
+      return;
     }
+    const section = apiSections.find((item) => item._id === sectionId);
+    setOrganizationUsers((items) => items.map((item) => item.id === studentId ? { ...item, section: sectionId || null } : item));
+    setStudents((items) => items.map((item) => item.id === studentId ? { ...item, sectionId, section: section?.name || "Unassigned" } : item));
+    onAction(sectionId ? "Student assigned to section." : "Student removed from section.");
+  }
+
+  async function editSection(section: SectionRow) {
+    const response = await updateSection(section.id, {
+      name: section.name, code: section.code, department: section.department,
+      batch: section.batch, academicYear: section.academicYear,
+      description: section.description, status: section.status === "Active" ? "active" : "inactive",
+    });
+    setApiSections((items) => items.map((item) => item._id === section.id ? response.section : item));
+    setSections((items) => items.map((item) => item.id === section.id ? mapSection(response.section) : item));
+    onAction("Section updated.");
   }
 
   async function addCoordinator(coordinator: CoordinatorRow, teacherId?: string) {
@@ -230,19 +209,16 @@ export function AdminSection({
     section?: string;
     password?: string;
   }) {
-    try {
-      const response = await createUser({
-        ...user,
-        organization: getOrganizationId(currentUser?.organization),
-        roleName: "student",
-      });
-      await refreshOrganizationUsers();
-      setSelectedStudentId(response.user.id || response.user._id || "");
-      onAction(response.temporaryPassword ? `Student created. Temporary password: ${response.temporaryPassword}` : response.message || "Student created.");
-    } catch (error) {
-      onAction(error instanceof Error ? error.message : "Student creation failed.");
-    }
+    const response = await createUser({
+      ...user,
+      organization: getOrganizationId(currentUser?.organization),
+      roleName: "student",
+    });
+    await refreshOrganizationUsers();
+    setSelectedStudentId(response.user.id || response.user._id || "");
+    onAction(response.temporaryPassword ? `Student created. Temporary password: ${response.temporaryPassword}` : response.message || "Student created.");
   }
+
 
   function addRole(role: CoordinatorRole) {
     setRoles((items) => [role, ...items]);
@@ -333,9 +309,13 @@ export function AdminSection({
     }
   }
 
+  if (usersLoading || workLoading) return <PageSkeleton label={`Loading ${activeNav.toLowerCase()}`} />;
+  if (loadError) return <LoadError message={loadError} onRetry={() => { void refreshOrganizationUsers(); void refreshOrganizationWork(); }} />;
+
   if (activeNav === "Students") {
     return (
       <StudentsAdmin
+        canManage={currentUser?.role !== "teacher"}
         sections={sections}
         students={students}
         selectedStudent={selectedStudent}
@@ -350,11 +330,13 @@ export function AdminSection({
   if (activeNav === "Sections") {
     return (
       <SectionsAdmin
+        canManage={currentUser?.role !== "teacher"}
         sections={sections}
         students={students}
         selectedSection={selectedSection}
         selectedStudent={selectedStudent}
         onCreateSection={createSection}
+        onUpdateSection={editSection}
         onSelectSection={setSelectedSectionId}
         onSelectStudent={setSelectedStudentId}
         onMoveStudent={moveStudent}
@@ -398,20 +380,3 @@ export function AdminSection({
 
   return <AdminDashboard sections={sections} students={students} coordinators={coordinators} tasks={tasks} assessments={assessments} loading={usersLoading || workLoading} loadError={loadError} onAction={onAction} />;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, ChevronDown, ChevronRight, FileText, GitCommitHorizontal, LifeBuoy, LoaderCircle, Plus, Settings } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, FileText, GitCommitHorizontal, LoaderCircle, Plus, Settings } from "lucide-react";
 import { ChangePasswordCard } from "@/components/common/change-password-card";
 import { DonutProgress } from "@/components/common/donut-progress";
 import { SectionIntro } from "@/components/common/section-intro";

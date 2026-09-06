@@ -1,39 +1,28 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, Building2, Check, ChevronDown, ChevronRight, CreditCard, FileText, GitCommitHorizontal, LifeBuoy, LoaderCircle, Mail, MapPin, Phone, Plus, Settings, ShieldCheck, Users, X, type LucideIcon } from "lucide-react";
-import { ChangePasswordCard } from "@/components/common/change-password-card";
-import { ApiNotice, InfoTile } from "@/components/common/admin-primitives";
-import { DonutProgress } from "@/components/common/donut-progress";
-import { EmptyState } from "@/components/common/empty-state";
-import { FieldError, isValidEmail } from "@/components/common/form-validation";
-import { SkeletonRows } from "@/components/common/loading-state";
-import { SectionIntro } from "@/components/common/section-intro";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { auditLogs, organizationRequests, organizations, supportTickets } from "@/data/super-admin";
-import { cn } from "@/lib/utils";
-import { createFeature as createFeatureRecord, listFeatures, updateFeature } from "@/services/features.service";
+import { useEffect, useState } from "react";
+
+import { PageSkeleton, LoadError } from "@/components/common/loading-state";
+
+import { listFeatures } from "@/services/features.api.service";
 import {
   approveOrganizationRegistration,
   listOrganizationRegistrations,
   rejectOrganizationRegistration,
-} from "@/services/organization-registrations.service";
-import { listOrganizations, updateOrganization } from "@/services/organizations.service";
-import { listPermissions, listRoles, syncOrganizationRoles, updateRole } from "@/services/roles.service";
-import { createUser as createUserRecord, listUsers, updateUser } from "@/services/users.service";
+} from "@/services/organization-registrations.api.service";
+import { listOrganizations, updateOrganization } from "@/services/organizations.api.service";
+import { listPermissions, listRoles } from "@/services/roles.api.service";
+import { listUsers } from "@/services/users.api.service";
 import { mapOrganization, mapRegistration } from "@/sections/super-admin/super-admin-mappers";
 import { UsersPage, FeaturesPage, RolesSettingsPage } from "@/sections/super-admin/components/access-pages";
 import { OrganizationsPage, RequestsPage } from "@/sections/super-admin/components/organization-pages";
-import { AnalyticsPage, AuditPage, ChangelogPage, PlansPage, PlatformSettingsPage, SupportPage } from "@/sections/super-admin/components/platform-pages";
+import { AnalyticsPage, AuditPage, ChangelogPage, PlansPage, SupportPage } from "@/sections/super-admin/components/platform-pages";
 import { SuperAdminDashboard } from "@/sections/super-admin/components/super-admin-dashboard";
-import type { AcceptedOrganization, ApiRole, ApiUser, Feature, RegisterOrg } from "@/types/api";
-import type { CommitEntry, OrganizationRequest, OrganizationRow, SuperAdminNavLabel } from "@/types/super-admin";
+import type { AcceptedOrganization, ApiRole, ApiUser, Feature } from "@/types/api";
+import type { OrganizationRequest, OrganizationRow, SuperAdminNavLabel } from "@/types/super-admin";
 
 export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdminNavLabel; onAction: (message: string) => void }) {
-  const [orgRows, setOrgRows] = useState<OrganizationRow[]>(organizations);
+  const [orgRows, setOrgRows] = useState<OrganizationRow[]>([]);
   const [apiOrganizations, setApiOrganizations] = useState<AcceptedOrganization[]>([]);
-  const [requests, setRequests] = useState<OrganizationRequest[]>(organizationRequests);
+  const [requests, setRequests] = useState<OrganizationRequest[]>([]);
   const [apiUsers, setApiUsers] = useState<ApiUser[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
   const [roles, setRoles] = useState<ApiRole[]>([]);
@@ -113,6 +102,9 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
     }
   }
 
+  if (platformLoading) return <PageSkeleton label={`Loading ${activeNav.toLowerCase()}`} />;
+  if (loadError) return <LoadError message={loadError} onRetry={() => void refreshPlatformData()} />;
+
   if (activeNav === "Organizations") {
     return (
       <OrganizationsPage
@@ -151,19 +143,3 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
 
   return <SuperAdminDashboard organizations={orgRows} requests={requests} loading={platformLoading} loadError={loadError} onAction={onAction} />;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

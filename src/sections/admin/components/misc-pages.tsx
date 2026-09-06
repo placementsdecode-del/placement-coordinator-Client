@@ -104,7 +104,7 @@ export function ReportsAdmin({ sections, students }: { sections: SectionRow[]; s
           </CardHeader>
           <CardContent className="grid max-w-3xl gap-3 md:grid-cols-2">
             {sections.length ? sections.map((section) => {
-              const sectionStudents = students.filter((student) => student.section === section.name);
+              const sectionStudents = students.filter((student) => student.sectionId === section.id);
               const sectionPlaced = sectionStudents.filter((student) => student.placementStatus === "Placed").length;
               const sectionRate = Math.round((sectionPlaced / Math.max(sectionStudents.length, 1)) * 100);
 

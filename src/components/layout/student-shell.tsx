@@ -54,7 +54,7 @@ export function StudentShell({
           <Button className="hidden lg:inline-flex" variant="ghost" size="icon" onClick={onToggleSidebar} aria-label="Minimize navigation">
             {sidebarCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
           </Button>
-          <Button className="lg:hidden" variant="ghost" size="icon" onClick={onCloseMenu}>
+          <Button className="lg:hidden" variant="ghost" size="icon" onClick={onCloseMenu} aria-label="Close navigation">
             <X className="h-5 w-5" />
           </Button>
         </div>
@@ -62,6 +62,7 @@ export function StudentShell({
           {navItems.map((item) => (
             <button
               key={item.label}
+              aria-current={activeNav === item.label ? "page" : undefined}
               title={sidebarCollapsed ? item.label : undefined}
               className={cn(
                 "group relative flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-medium transition-colors",
@@ -91,12 +92,12 @@ export function StudentShell({
       <div className={cn("transition-[padding-left]", sidebarCollapsed ? "lg:pl-20" : "lg:pl-72")}>
         <header
           className={cn(
-            "fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between border-b bg-white/90 px-4 backdrop-blur transition-[left] md:px-6",
+            "fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between border-b bg-white px-4 transition-[left] md:px-6",
             sidebarCollapsed ? "lg:left-20" : "lg:left-72",
           )}
         >
           <div className="flex min-w-0 items-center gap-3">
-            <Button className="lg:hidden" variant="outline" size="icon" onClick={onOpenMenu}>
+            <Button className="lg:hidden" variant="outline" size="icon" onClick={onOpenMenu} aria-label="Open navigation">
               <Menu className="h-5 w-5" />
             </Button>
             <div className="min-w-0">
@@ -117,11 +118,12 @@ export function StudentShell({
         <div className="space-y-5 p-3 pb-28 pt-20 sm:space-y-6 sm:p-4 sm:pb-28 sm:pt-20 md:p-6 md:pt-20 lg:pb-6">{children}</div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-10px_30px_rgba(31,41,55,0.08)] backdrop-blur lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-white px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-10px_30px_rgba(31,41,55,0.08)] lg:hidden">
         <div className="grid grid-cols-5 gap-1">
           {mobileNavItems.map((item) => (
             <button
               key={item.label}
+              aria-current={activeNav === item.label ? "page" : undefined}
               className={cn(
                 "flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-medium leading-tight transition-colors",
                 activeNav === item.label ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
