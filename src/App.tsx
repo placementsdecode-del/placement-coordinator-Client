@@ -1,3 +1,4 @@
+import { notifyCommunityChanged } from "@/sections/community/community-events";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { LandingScreen } from "@/components/layout/landing-screen";
@@ -6,30 +7,28 @@ import { SuperAdminShell } from "@/components/layout/super-admin-shell";
 import { LoginScreen } from "@/components/layout/login-screen";
 import { adminNavItems } from "@/data/admin";
 import { superAdminNavItems } from "@/data/super-admin";
-import { initialAnnouncements, initialAssessments, initialHomework, initialTasks, navItems } from "@/data/student";
+import { navItems } from "@/data/student";
 import type { AdminNavLabel } from "@/types/admin";
 import { clearAccessToken, getAccessToken, setAccessToken } from "@/services/api-client";
 import { getCurrentUser, login } from "@/services/auth.api.service";
 import type { SessionUser, UserRole } from "@/types/auth";
 import { toAppRole } from "@/types/auth";
 import type { SuperAdminNavLabel } from "@/types/super-admin";
-import type { AnnouncementItem, AssessmentItem, HomeworkItem, NavLabel, TaskItem } from "@/types/student";
+import type { NavLabel } from "@/types/student";
 
 import { PageSkeleton } from "@/components/common/loading-state";
 
+const StudentReadiness = lazy(() => import("@/sections/readiness/student-readiness").then(module => ({ default: module.StudentReadiness })));
+const CoordinatorReadiness = lazy(() => import("@/sections/readiness/coordinator-readiness").then(module => ({ default: module.CoordinatorReadiness })));
+const AssessmentAttempts = lazy(() => import("@/sections/readiness/assessment-attempts").then(module => ({ default: module.AssessmentAttempts })));
+const MySection = lazy(() => import("@/sections/community/student-community").then(module => ({ default: module.MySection })));
+const MyGroups = lazy(() => import("@/sections/community/student-community").then(module => ({ default: module.MyGroups })));
+const MyAssignedWork = lazy(() => import("@/sections/community/student-community").then(module => ({ default: module.MyAssignedWork })));
 const AdminSection = lazy(() => import("@/sections/admin/admin-section").then((module) => ({ default: module.AdminSection })));
-const ActivitiesSection = lazy(() => import("@/sections/activities/activities-section").then((module) => ({ default: module.ActivitiesSection })));
-const AnnouncementsSection = lazy(() => import("@/sections/announcements/announcements-section").then((module) => ({ default: module.AnnouncementsSection })));
-const AssessmentsSection = lazy(() => import("@/sections/assessments/assessments-section").then((module) => ({ default: module.AssessmentsSection })));
 const CareerRoadmapsSection = lazy(() => import("@/sections/career-roadmaps/career-roadmaps-section").then((module) => ({ default: module.CareerRoadmapsSection })));
 const CodingPracticeSection = lazy(() => import("@/sections/coding-practice/coding-practice-section").then((module) => ({ default: module.CodingPracticeSection })));
-const DailyTasksSection = lazy(() => import("@/sections/daily-tasks/daily-tasks-section").then((module) => ({ default: module.DailyTasksSection })));
-const DashboardSection = lazy(() => import("@/sections/dashboard/dashboard-section").then((module) => ({ default: module.DashboardSection })));
-const HomeworkSection = lazy(() => import("@/sections/homework/homework-section").then((module) => ({ default: module.HomeworkSection })));
-const PreparationProgressSection = lazy(() => import("@/sections/preparation-progress/preparation-progress-section").then((module) => ({ default: module.PreparationProgressSection })));
 const ProfileSection = lazy(() => import("@/sections/profile/profile-section").then((module) => ({ default: module.ProfileSection })));
 const OrganizationRegistrationPage = lazy(() => import("@/pages/public/organization-registration").then((module) => ({ default: module.OrganizationRegistrationPage })));
-const ResultsSection = lazy(() => import("@/sections/results/results-section").then((module) => ({ default: module.ResultsSection })));
 const SelfAssessmentSection = lazy(() => import("@/sections/self-assessment/self-assessment-section").then((module) => ({ default: module.SelfAssessmentSection })));
 const StudyMaterialsSection = lazy(() => import("@/sections/study-materials/study-materials-section").then((module) => ({ default: module.StudyMaterialsSection })));
 const SuperAdminSection = lazy(() => import("@/sections/super-admin/super-admin-section").then((module) => ({ default: module.SuperAdminSection })));
@@ -82,11 +81,6 @@ function App() {
   const [activeSuperAdminNav, setActiveSuperAdminNav] = useState<SuperAdminNavLabel>(() => navFromPath("/super-admin", superAdminNavItems.map((item) => item.label), "Dashboard"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [query, setQuery] = useState("");
-  const [taskItems, setTaskItems] = useState<TaskItem[]>(initialTasks);
-  const [homeworkItems, setHomeworkItems] = useState<HomeworkItem[]>(initialHomework);
-  const [assessmentItems, setAssessmentItems] = useState<AssessmentItem[]>(initialAssessments);
-  const [announcementItems, setAnnouncementItems] = useState<AnnouncementItem[]>(initialAnnouncements);
   const [toastMessage, setToastMessage] = useState("");
 
   function showToast(message: string) {
@@ -114,37 +108,6 @@ function App() {
       })
       .finally(() => setSessionLoading(false));
   }, []);
-
-  function handleTaskAction(title: string) {
-    setTaskItems((items) =>
-      items.map((item) => {
-        if (item.title !== title) return item;
-        if (item.status === "Not started") return { ...item, status: "In progress" };
-        return { ...item, status: "Completed" };
-      }),
-    );
-    showToast("Task status updated.");
-  }
-
-  function handleSubmitHomework(title: string) {
-    setHomeworkItems((items) => items.map((item) => (item.title === title ? { ...item, status: "Submitted" } : item)));
-    showToast("Homework submitted successfully.");
-  }
-
-  function handleCreateAssessment(assessment: AssessmentItem) {
-    setAssessmentItems((items) => [assessment, ...items]);
-    showToast("Practice assessment created.");
-  }
-
-  function handleJoinAssessment(title: string) {
-    setAssessmentItems((items) => items.map((item) => (item.title === title ? { ...item, status: "Joined" } : item)));
-    showToast("Assessment joined.");
-  }
-
-  function handleMarkRead() {
-    setAnnouncementItems((items) => items.map((item) => ({ ...item, read: true })));
-    showToast("All announcements marked read.");
-  }
 
   async function handleLogin(email: string, password: string) {
     const response = await login(email, password);
@@ -188,12 +151,15 @@ function App() {
 
   function renderSection() {
     switch (activeNav) {
+      case "My Section": return <MySection />;
+      case "My Groups": return <MyGroups onChanged={notifyCommunityChanged} />;
+      case "Assigned Work": return <MyAssignedWork />;
       case "Activities":
-        return <ActivitiesSection />;
+        return <MyAssignedWork kind="activity" />;
       case "Daily Tasks":
-        return <DailyTasksSection query={query} setQuery={setQuery} taskItems={taskItems} onTaskAction={handleTaskAction} />;
+        return <MyAssignedWork kind="task" />;
       case "Placement Homework":
-        return <HomeworkSection homeworkItems={homeworkItems} onSubmitHomework={handleSubmitHomework} />;
+        return <MyAssignedWork kind="homework" />;
       case "Study Materials":
         return <StudyMaterialsSection onAction={showToast} />;
       case "Career Roadmaps":
@@ -202,24 +168,17 @@ function App() {
         return <CodingPracticeSection onAction={showToast} />;
       case "Self-Assessment":
         return <SelfAssessmentSection onLaunch={(title) => showToast(`${title} launched.`)} />;
-      case "Assessments":
-        return (
-          <AssessmentsSection
-            assessmentItems={assessmentItems}
-            onCreateAssessment={handleCreateAssessment}
-            onJoinAssessment={handleJoinAssessment}
-          />
-        );
+      case "Assessments": return <AssessmentAttempts />;
       case "Results":
-        return <ResultsSection />;
+        return <StudentReadiness />;
       case "Announcements":
-        return <AnnouncementsSection announcementItems={announcementItems} onMarkRead={handleMarkRead} />;
+        return <MyAssignedWork kind="announcement" />;
       case "Preparation Progress":
-        return <PreparationProgressSection />;
+        return <StudentReadiness />;
       case "Profile":
         return <ProfileSection mustChangePassword={currentUser?.mustChangePassword} />;
       default:
-        return <DashboardSection taskItems={taskItems} onTaskAction={handleTaskAction} />;
+        return <StudentReadiness />;
     }
   }
 
@@ -282,7 +241,7 @@ function App() {
         onLogout={logout}
         onDismissToast={() => setToastMessage("")}
       >
-        <Suspense fallback={<PageSkeleton />}><AdminSection activeNav={activeAdminNav} currentUser={currentUser} onAction={showToast} /></Suspense>
+        <Suspense fallback={<PageSkeleton />}>{["Dashboard", "Readiness"].includes(activeAdminNav) ? <CoordinatorReadiness /> : <AdminSection activeNav={activeAdminNav} currentUser={currentUser} onAction={showToast} />}</Suspense>
       </AdminShell>
     );
   }

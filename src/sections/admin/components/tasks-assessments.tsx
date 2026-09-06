@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ClipboardList, FileText, LoaderCircle, Plus } from "lucide-react";
+import { FileText, LoaderCircle, Plus } from "lucide-react";
 import { EmptyState } from "@/components/common/empty-state";
 import { FieldError } from "@/components/common/form-validation";
 import { SkeletonRows } from "@/components/common/loading-state";
@@ -8,123 +8,37 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { AdminAssessment, AdminTask, SectionRow } from "@/types/admin";
-
-export function TasksAdmin({ tasks, sections, onAddTask }: { tasks: AdminTask[]; sections: SectionRow[]; onAddTask: (task: AdminTask) => void }) {
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState("Daily Task");
-  const [assignedTo, setAssignedTo] = useState(sections[0]?.name ?? "");
-  const previewTitle = title || "Untitled placement task";
-
-  return (
-    <>
-      <SectionIntro
-        eyebrow="Tasks"
-        title="Create tasks and preview how students will receive them."
-        description="Assign daily tasks, homework, reflections, or coding work to sections, groups, or selected students."
-      />
-      <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Create Task</CardTitle>
-            <CardDescription>Task setup and assignment.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="max-w-3xl space-y-3">
-            <Input placeholder="Task title" value={title} onChange={(event) => setTitle(event.target.value)} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={type} onChange={(event) => setType(event.target.value)}>
-                <option>Daily Task</option>
-                <option>Placement Homework</option>
-                <option>Coding Practice</option>
-                <option>Resume Review</option>
-              </select>
-              <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)}>
-                {sections.map((section) => <option key={section.id}>{section.name}</option>)}
-              </select>
-            </div>
-            <textarea className="min-h-28 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" placeholder="Instructions, attachments, expected outcome, evaluation notes" />
-            <div className="flex justify-end">
-              <Button onClick={() => onAddTask({ id: crypto.randomUUID(), title: previewTitle, type, assignedTo, due: "Tomorrow, 5:00 PM", status: "Draft", submissions: 0 })}>
-                Create Task
-              </Button>
-            </div>
-            </div>
-          </CardContent>
-        </Card>
-        <StudentTaskPreview title={previewTitle} type={type} assignedTo={assignedTo} />
-      </section>
-      <Card>
-        <CardHeader>
-          <CardTitle>Task Board</CardTitle>
-          <CardDescription>Created tasks and submission progress.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {tasks.length ? tasks.map((task) => (
-            <div key={task.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_140px_120px] md:items-center">
-              <div>
-                <p className="font-semibold">{task.title}</p>
-                <p className="text-sm text-muted-foreground">{task.type} · {task.assignedTo} · {task.due}</p>
-              </div>
-              <Badge variant="outline">{task.status}</Badge>
-              <p className="text-sm text-muted-foreground">{task.submissions} submissions</p>
-            </div>
-          )) : (
-            <EmptyState icon={ClipboardList} title="No tasks yet" description="Create a task to assign preparation work to students." />
-          )}
-        </CardContent>
-      </Card>
-    </>
-  );
-}
-
-export function StudentTaskPreview({ title, type, assignedTo }: { title: string; type: string; assignedTo: string }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Student Preview</CardTitle>
-        <CardDescription>How this task appears to assigned students.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="rounded-lg border bg-primary/5 p-4">
-          <Badge>{type}</Badge>
-          <h3 className="mt-3 text-lg font-bold">{title}</h3>
-          <p className="mt-2 text-sm text-muted-foreground">{assignedTo ? `Assigned to ${assignedTo}.` : "Audience not selected."} Due date will be set during publish.</p>
-        </div>
-        <div className="rounded-lg border p-3 text-sm text-muted-foreground">
-          Students will see instructions, attachments, comments, upload controls, and coordinator feedback after review.
-        </div>
-        <div className="flex justify-end">
-          <Button variant="outline">Open Student View Preview</Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+import type { AdminAssessment, SectionRow } from "@/types/admin";
 
 export function AssessmentsAdmin({
   assessments,
   sections,
-  onAddAssessment,
   onCreateValidatedAssessment,
   loading,
+  onPublish,
 }: {
   assessments: AdminAssessment[];
   sections: SectionRow[];
-  onAddAssessment: (assessment: AdminAssessment) => void;
-  onCreateValidatedAssessment: (assessment: AdminAssessment & { questions: Array<{ id: string; type: string; text: string; options: string[]; marks: string; correctAnswer?: string }> }) => Promise<void>;
+  onCreateValidatedAssessment: (assessment: AdminAssessment & { difficulty?: string; attemptsAllowed?: number; questions: Array<{ id: string; type: string; text: string; options: string[]; marks: string; correctAnswer?: string }> }) => Promise<void>;
   loading: boolean;
+  onPublish: (id: string) => Promise<void>;
 }) {
+  const [publishing, setPublishing] = useState("");
+  const [publishError, setPublishError] = useState("");
   const [title, setTitle] = useState("");
-  const [type, setType] = useState("Written Test");
-  const [assignedTo, setAssignedTo] = useState(sections[0]?.name ?? "");
+  const [type, setType] = useState("coding");
+  const [assignedTo, setAssignedTo] = useState(sections[0]?.id ?? "");
   const [instructions, setInstructions] = useState("");
+  const [difficulty, setDifficulty] = useState("intermediate");
+  const [duration, setDuration] = useState("60");
+  const [attemptsAllowed, setAttemptsAllowed] = useState("1");
+  const [correctAnswer, setCorrectAnswer] = useState("");
   const [rubric, setRubric] = useState("");
   const [questionType, setQuestionType] = useState("MCQ");
   const [questionText, setQuestionText] = useState("");
   const [questionOptions, setQuestionOptions] = useState("");
   const [questionMarks, setQuestionMarks] = useState("");
-  const [questions, setQuestions] = useState<Array<{ id: string; type: string; text: string; options: string[]; marks: string }>>([]);
+  const [questions, setQuestions] = useState<Array<{ id: string; type: string; text: string; options: string[]; marks: string; correctAnswer?: string }>>([]);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -139,6 +53,7 @@ export function AssessmentsAdmin({
     if (questionType === "MCQ" && questionOptions.split(",").map((option) => option.trim()).filter(Boolean).length < 2) {
       nextErrors.questionOptions = "Add at least two comma-separated options.";
     }
+    if (questionType === "MCQ" && !questionOptions.split(",").map(option => option.trim()).includes(correctAnswer.trim())) nextErrors.correctAnswer = "Choose the correct answer from the options.";
     setErrors((current) => ({ ...current, ...nextErrors }));
     if (Object.keys(nextErrors).length) return;
     setQuestions((items) => [
@@ -149,6 +64,7 @@ export function AssessmentsAdmin({
         text,
         options: questionOptions.split(",").map((option) => option.trim()).filter(Boolean),
         marks: questionMarks,
+        correctAnswer: correctAnswer.trim(),
       },
     ]);
     setQuestionText("");
@@ -159,6 +75,9 @@ export function AssessmentsAdmin({
 
   function validateAssessmentForm() {
     const nextErrors: Record<string, string> = {};
+    if (!type.trim()) nextErrors.title = "Assessment skill is required.";
+    if (!Number.isInteger(Number(duration)) || Number(duration) < 1 || Number(duration) > 600) nextErrors.questions = "Duration must be 1–600 minutes.";
+    if (!Number.isInteger(Number(attemptsAllowed)) || Number(attemptsAllowed) < 1 || Number(attemptsAllowed) > 20) nextErrors.questions = "Attempts must be 1–20.";
     if (!title.trim()) nextErrors.title = "Assessment title is required.";
     if (!assignedTo) nextErrors.assignedTo = "Select an audience.";
     if (!instructions.trim()) nextErrors.instructions = "Instructions are required.";
@@ -187,15 +106,11 @@ export function AssessmentsAdmin({
               <FieldError message={errors.title} />
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
-              <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={type} onChange={(event) => setType(event.target.value)}>
-                <option>Written Test</option>
-                <option>Mock Interview</option>
-                <option>Group Discussion</option>
-                <option>Coding Round</option>
-              </select>
+              <label className="text-sm font-medium">Assessment skill<Input aria-label="Assessment skill" placeholder="coding, aptitude, dsa, communication…" value={type} onChange={event => setType(event.target.value)} /></label>
+
               <div className="space-y-1">
               <select className="h-11 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)}>
-                {sections.map((section) => <option key={section.id}>{section.name}</option>)}
+                {sections.map((section) => <option key={section.id} value={section.id}>{section.name} · {section.code}</option>)}
                 <option>Aptitude Group</option>
                 <option>Interview Group</option>
               </select>
@@ -239,7 +154,8 @@ export function AssessmentsAdmin({
                   <FieldError message={errors.questionOptions} />
                 </div>
               ) : null}
-              <Button className="mt-3" variant="outline" onClick={addQuestion}>
+              {questionType === "MCQ" && <label className="block text-sm font-medium">Correct answer<Input value={correctAnswer} onChange={event => setCorrectAnswer(event.target.value)} /><FieldError message={errors.correctAnswer} /></label>}
+                  <Button className="mt-3" variant="outline" onClick={addQuestion}>
                 <Plus className="h-4 w-4" />
                 Add Question
               </Button>
@@ -256,15 +172,21 @@ export function AssessmentsAdmin({
                 ))}
               </div>
             </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="text-sm font-medium">Difficulty<select aria-label="Assessment difficulty" className="h-11 w-full rounded-md border bg-white px-3" value={difficulty} onChange={event => setDifficulty(event.target.value)}><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label>
+              <label className="text-sm font-medium">Duration (minutes)<Input type="number" min="1" max="600" value={duration} onChange={event => setDuration(event.target.value)} /></label>
+              <label className="text-sm font-medium">Attempts allowed<Input type="number" min="1" max="20" value={attemptsAllowed} onChange={event => setAttemptsAllowed(event.target.value)} /></label>
+            </div>
             <Button
               disabled={submitting}
               onClick={async () => {
                 if (!validateAssessmentForm()) return;
-                const assessment = { id: crypto.randomUUID(), title: previewTitle, type, assignedTo, duration: "60 min", instructions, rubric, status: `Draft · ${questions.length} ${questions.length === 1 ? "question" : "questions"}`, questions };
+                const assessment = { id: crypto.randomUUID(), title: previewTitle, type, assignedTo, duration: `${duration} min`, difficulty, attemptsAllowed: Number(attemptsAllowed), instructions, rubric, status: `Draft · ${questions.length} ${questions.length === 1 ? "question" : "questions"}`, questions };
                 setSubmitting(true);
                 try {
-                  onAddAssessment(assessment);
                   await onCreateValidatedAssessment(assessment);
+                } catch (error) {
+                  setErrors(current => ({ ...current, questions: error instanceof Error ? error.message : "Unable to create assessment." }));
                 } finally {
                   setSubmitting(false);
                 }
@@ -277,7 +199,7 @@ export function AssessmentsAdmin({
             </div>
           </CardContent>
         </Card>
-        <AssessmentPreview title={previewTitle} type={type} assignedTo={assignedTo} instructions={instructions} rubric={rubric} questions={questions} />
+        <AssessmentPreview title={previewTitle} type={type} assignedTo={sections.find(section => section.id === assignedTo)?.name || "Unassigned"} instructions={instructions} rubric={rubric} questions={questions} />
       </section>
       <Card>
         <CardHeader>
@@ -285,11 +207,13 @@ export function AssessmentsAdmin({
           <CardDescription>Created assessments and publish state.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          {publishError && <p role="alert" className="text-destructive">{publishError}</p>}
           {loading ? <SkeletonRows rows={3} /> : assessments.length ? assessments.map((assessment) => (
             <div key={assessment.id} className="rounded-lg border p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-semibold">{assessment.title}</p>
                 <Badge variant="outline">{assessment.status}</Badge>
+                {assessment.status.startsWith("draft") && <Button disabled={!!publishing} onClick={async () => { setPublishing(assessment.id); setPublishError(""); try { await onPublish(assessment.id); } catch (error) { setPublishError(error instanceof Error ? error.message : "Unable to publish."); } finally { setPublishing(""); } }}>{publishing === assessment.id ? "Publishing…" : "Publish and notify"}</Button>}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{assessment.type} · {assessment.assignedTo} · {assessment.duration}</p>
             </div>

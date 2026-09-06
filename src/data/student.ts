@@ -1,4 +1,4 @@
-import { Activity, Bell, BookOpenCheck, CalendarDays, ClipboardCheck, Code2, Compass, Library, LayoutDashboard, LineChart, ListChecks, Trophy, UserRound } from "lucide-react";
+import { Users, Activity, Bell, BookOpenCheck, CalendarDays, ClipboardCheck, Code2, Compass, Library, LayoutDashboard, LineChart, ListChecks, Trophy, UserRound } from "lucide-react";
 import type {
   ActivityItem,
   AnnouncementItem,
@@ -20,6 +20,9 @@ import type {
 
 export const navItems: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard },
+  { label: "My Section", icon: Users },
+  { label: "My Groups", icon: Users },
+  { label: "Assigned Work", icon: ListChecks },
   { label: "Activities", icon: Activity },
   { label: "Daily Tasks", icon: ListChecks },
   { label: "Placement Homework", icon: BookOpenCheck },

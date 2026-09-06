@@ -1,0 +1,30 @@
+import { useState } from 'react';
+import { recordReadinessEvidence } from '@/services/readiness.api.service';
+import type { ReadinessPolicy, ReadinessStudent } from '@/types/readiness';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { selectClass } from './readiness-view';
+export function EvidenceForm({ policy, students, onSaved }: { policy: ReadinessPolicy; students?: ReadinessStudent[]; onSaved: () => void }) {
+  const staff = !!students;
+  const [studentId, setStudentId] = useState(students?.[0]?.id || ''); const [skill, setSkill] = useState(policy.skills[0]?.key || 'coding');
+  const [title, setTitle] = useState(''); const [reference, setReference] = useState(''); const [difficulty, setDifficulty] = useState('intermediate');
+  const [score, setScore] = useState(''); const [maximum, setMaximum] = useState('100'); const [rubric, setRubric] = useState(''); const [feedback, setFeedback] = useState('');
+  const [solved, setSolved] = useState(false); const [submissions, setSubmissions] = useState('1'); const [cases, setCases] = useState(''); const [passed, setPassed] = useState('');
+  const [pending, setPending] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState(''); const [requestId, setRequestId] = useState(() => crypto.randomUUID());
+  return <Card><CardHeader><CardTitle>{staff ? 'Record a rubric-based evaluation' : 'Log problem-solving practice'}</CardTitle></CardHeader><CardContent><form onSubmit={async event => { event.preventDefault(); setPending(true); setError(''); setMessage(''); try {
+    await recordReadinessEvidence({ requestId, studentId, skill, title, reference, difficulty, ...(staff ? { score: Number(score), maxScore: Number(maximum), rubric, feedback } : { solved, submissions: Number(submissions), ...(cases ? { testCasesTotal: Number(cases), testCasesPassed: Number(passed) } : {}) }) });
+    setTitle(''); setReference(''); setScore(''); setRequestId(crypto.randomUUID()); setMessage(staff ? 'Evaluation recorded.' : 'Practice recorded as self-reported evidence.'); onSaved();
+  } catch (error) { setError(error instanceof Error ? error.message : 'Unable to record evidence.'); } finally { setPending(false); } }}>
+    <fieldset disabled={pending} className="grid gap-3 sm:grid-cols-2">
+      {staff && <label className="text-sm font-medium">Student<select aria-label="Evaluation student" className={selectClass} value={studentId} onChange={event => setStudentId(event.target.value)} required><option value="">Choose a student</option>{students.map(student => <option key={student.id} value={student.id}>{student.name} · {student.registrationNumber}</option>)}</select></label>}
+      <label className="text-sm font-medium">Skill<select aria-label="Evidence skill" className={selectClass} value={skill} onChange={event => setSkill(event.target.value)}>{policy.skills.map(skill => <option key={skill.key} value={skill.key}>{skill.label}</option>)}</select></label>
+      <label className="text-sm font-medium">Title<Input required maxLength={200} value={title} onChange={event => setTitle(event.target.value)} /></label>
+      <label className="text-sm font-medium">Problem / evaluation reference<Input required maxLength={200} placeholder="Stable ID or URL; reuse for retries" value={reference} onChange={event => setReference(event.target.value)} /></label>
+      <label className="text-sm font-medium">Difficulty<select aria-label="Evidence difficulty" className={selectClass} value={difficulty} onChange={event => setDifficulty(event.target.value)}><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label>
+      {staff ? <><label className="text-sm font-medium">Marks awarded<Input required type="number" min="0" max={maximum} step="0.1" value={score} onChange={event => setScore(event.target.value)} /></label><label className="text-sm font-medium">Maximum marks<Input required type="number" min="1" max="10000" value={maximum} onChange={event => setMaximum(event.target.value)} /></label><label className="text-sm font-medium sm:col-span-2">Evaluation rubric<textarea required maxLength={5000} className="min-h-24 w-full rounded-md border p-3" placeholder="Describe the criteria and what the score represents" value={rubric} onChange={event => setRubric(event.target.value)} /></label><label className="text-sm font-medium sm:col-span-2">Feedback<Input maxLength={5000} value={feedback} onChange={event => setFeedback(event.target.value)} /></label></> : <><label className="text-sm font-medium">Submissions<Input type="number" required min="1" max="1000" value={submissions} onChange={event => setSubmissions(event.target.value)} /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={solved} onChange={event => setSolved(event.target.checked)} />Solved successfully</label><label className="text-sm font-medium">Test cases (optional)<Input type="number" min="1" max="100000" value={cases} onChange={event => setCases(event.target.value)} /></label><label className="text-sm font-medium">Test cases passed<Input type="number" required={!!cases} min="0" max={cases || undefined} value={passed} onChange={event => setPassed(event.target.value)} /></label></>}
+      <div className="sm:col-span-2"><Button disabled={pending} type="submit">{pending ? 'Saving…' : staff ? 'Record evaluation' : 'Save practice log'}</Button></div>
+    </fieldset><p className="mt-3 text-xs text-muted-foreground">{staff ? 'Use the same reference for retries of one evaluation. Records are append-only and include the evaluator identity.' : 'Practice logs help you track effort. Only graded assessments and instructor evaluations contribute to readiness.'}</p>
+    {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}{message && <p role="status" className="mt-3 text-sm text-primary">{message}</p>}
+  </form></CardContent></Card>;
+}

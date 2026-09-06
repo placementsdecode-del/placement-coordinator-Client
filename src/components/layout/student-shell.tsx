@@ -1,5 +1,9 @@
+import { useLearningTracker } from "@/sections/readiness/learning-tracker";
+import { getMySection } from "@/services/community.api.service";
+import { useCommunityData } from "@/sections/community/use-community-data";
+import { NotificationCenter } from "@/sections/community/notification-center";
 import type { ReactNode } from "react";
-import { Bell, LogOut, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { ActionToast } from "@/components/common/action-toast";
 import { BrandLogo } from "@/components/common/brand-logo";
 import { Button } from "@/components/ui/button";
@@ -32,6 +36,8 @@ export function StudentShell({
   onLogout: () => void;
   onDismissToast: () => void;
 }) {
+  const trackingError = useLearningTracker(activeNav);
+  const { data: community } = useCommunityData(getMySection);
   return (
     <main className="min-h-screen overflow-x-hidden bg-background">
       {mobileMenuOpen ? (
@@ -102,20 +108,18 @@ export function StudentShell({
             </Button>
             <div className="min-w-0">
               <h2 className="truncate text-lg font-semibold">{activeNav}</h2>
-              <p className="hidden text-sm text-muted-foreground sm:block">Student workspace</p>
+              <button className="block max-w-[45vw] truncate text-left text-xs text-muted-foreground hover:text-primary sm:text-sm" onClick={() => onChangeNav("My Section")}>{community ? community.section ? `${community.section.name} · ${community.section.code}` : "Section unassigned" : "View my section"}</button>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" aria-label="Notifications" onClick={() => onChangeNav("Announcements")}>
-              <Bell className="h-4 w-4" />
-            </Button>
+            <NotificationCenter onNavigate={onChangeNav} />
             <Button variant="ghost" size="icon" onClick={onLogout} aria-label="Logout">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </header>
 
-        <div className="space-y-5 p-3 pb-28 pt-20 sm:space-y-6 sm:p-4 sm:pb-28 sm:pt-20 md:p-6 md:pt-20 lg:pb-6">{children}</div>
+        <div className="space-y-5 p-3 pb-28 pt-20 sm:space-y-6 sm:p-4 sm:pb-28 sm:pt-20 md:p-6 md:pt-20 lg:pb-6">{trackingError && <p role="status" className="text-sm text-amber-700">Learning-time sync failed. Check your connection.</p>}{children}</div>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-white px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-10px_30px_rgba(31,41,55,0.08)] lg:hidden">

@@ -1,6 +1,9 @@
 import type { LucideIcon } from "lucide-react";
 
 export type NavLabel =
+  | "My Section"
+  | "My Groups"
+  | "Assigned Work"
   | "Dashboard"
   | "Activities"
   | "Daily Tasks"

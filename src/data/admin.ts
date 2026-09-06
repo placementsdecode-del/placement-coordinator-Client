@@ -23,6 +23,7 @@ import type {
 
 export const adminNavItems: AdminNavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard },
+  { label: "Readiness", icon: BarChart3 },
   { label: "Students", icon: Users },
   { label: "Coordinators", icon: ShieldCheck },
   { label: "Sections", icon: BookOpenCheck },

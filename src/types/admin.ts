@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 
 export type AdminNavLabel =
   | "Dashboard"
+  | "Readiness"
   | "Students"
   | "Coordinators"
   | "Sections"

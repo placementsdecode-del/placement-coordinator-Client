@@ -1,0 +1,18 @@
+import { apiFetch } from '@/services/api-client';
+import type { ReadinessPolicy, ReadinessQuery, ReadinessReport, CohortRow, AssessmentCatalog, Attempt } from '@/types/readiness';
+const queryString = (query: ReadinessQuery) => { const params = new URLSearchParams(); for (const [key, value] of Object.entries(query)) if (value) params.set(key, value); return `?${params}`; };
+export const listReadinessPolicies = () => apiFetch<{ policies: ReadinessPolicy[] }>('/api/readiness/policies');
+export const createReadinessPolicy = (policy: Omit<ReadinessPolicy, '_id' | 'version'>) => apiFetch<{ policy: ReadinessPolicy }>('/api/readiness/policies', { method: 'POST', body: JSON.stringify(policy) });
+export const getReadiness = (query: ReadinessQuery, studentId?: string) => apiFetch<ReadinessReport>(`/api/readiness/${studentId ? `students/${studentId}` : 'me'}${queryString(query)}`);
+export const getCohortReadiness = (query: ReadinessQuery) => apiFetch<{ policy: ReadinessPolicy; students: CohortRow[] }>(`/api/readiness/students${queryString(query)}`);
+export const recordLearningPulse = (seconds: number, context: string) => apiFetch('/api/readiness/activity', { method: 'POST', body: JSON.stringify({ seconds, context }) });
+export const recordReadinessEvidence = (payload: Record<string, unknown>) => apiFetch('/api/readiness/evidence', { method: 'POST', body: JSON.stringify(payload) });
+export const recordAcademics = (student: string, payload: Record<string, unknown>) => apiFetch(`/api/readiness/students/${student}/academics`, { method: 'POST', body: JSON.stringify(payload) });
+export const recordShortlistDecision = (student: string, query: ReadinessQuery, decision: string, reason: string) => apiFetch(`/api/readiness/students/${student}/decisions${queryString(query)}`, { method: 'POST', body: JSON.stringify({ decision, reason }) });
+export const setReadinessConsent = (granted: boolean) => apiFetch('/api/readiness/consent', { method: 'POST', body: JSON.stringify({ granted }) });
+export const getAssessmentCatalog = () => apiFetch<AssessmentCatalog>('/api/readiness/assessments');
+export const startAssessmentAttempt = (id: string) => apiFetch<{ attempt: Attempt }>(`/api/readiness/assessments/${id}/start`, { method: 'POST' });
+export const saveAssessmentAnswers = (attempt: Attempt, answers: Attempt['answers']) => apiFetch(`/api/readiness/attempts/${attempt.ledgerId}/${attempt.id}/answers`, { method: 'PATCH', body: JSON.stringify({ answers }) });
+export const submitAssessmentAttempt = (attempt: Attempt, answers: Attempt['answers']) => apiFetch<{ attempt: Attempt }>(`/api/readiness/attempts/${attempt.ledgerId}/${attempt.id}/submit`, { method: 'POST', body: JSON.stringify({ answers }) });
+export const getAssessmentReviews = () => apiFetch<{ attempts: Attempt[] }>('/api/readiness/reviews');
+export const reviewAssessmentAttempt = (attempt: Attempt, marks: number[], rubric: string, feedback: string) => apiFetch(`/api/readiness/attempts/${attempt.ledgerId}/${attempt.id}/review`, { method: 'POST', body: JSON.stringify({ marks, rubric, feedback }) });

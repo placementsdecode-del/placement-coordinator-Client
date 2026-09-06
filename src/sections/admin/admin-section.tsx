@@ -1,17 +1,19 @@
+import { GroupsAdmin } from "@/sections/community/groups-admin";
+import { WorkAdmin } from "@/sections/community/work-admin";
 import { useCallback, useEffect, useState } from "react";
 
 import { PageSkeleton, LoadError } from "@/components/common/loading-state";
 
 import { adminAssessments, adminCoordinators, adminTasks, coordinatorRoles } from "@/data/admin";
 import { listPermissions, listRoles, syncOrganizationRoles, updateRole } from "@/services/roles.api.service";
-import { createAssessment as createAssessmentRecord, listAssessments, validateAssessment } from "@/services/assessments.api.service";
+import { createAssessment as createAssessmentRecord, listAssessments, validateAssessment, updateAssessment } from "@/services/assessments.api.service";
 import { assignStudentToSection, removeStudentFromSection, createSection as createSectionRecord, listSections, updateSection } from "@/services/sections.api.service";
 import { createUser, listUsers } from "@/services/users.api.service";
 import { getOrganizationId, mapAssessment, mapSection, mapStudentUser } from "@/sections/admin/admin-mappers";
 import { AdminDashboard } from "@/sections/admin/components/admin-dashboard";
 import { CoordinatorsAdmin } from "@/sections/admin/components/coordinators-page";
-import { AnnouncementsAdmin, GroupsAdmin, ReportsAdmin, SettingsAdmin } from "@/sections/admin/components/misc-pages";
-import { AssessmentsAdmin, TasksAdmin } from "@/sections/admin/components/tasks-assessments";
+import { ReportsAdmin, SettingsAdmin } from "@/sections/admin/components/misc-pages";
+import { AssessmentsAdmin } from "@/sections/admin/components/tasks-assessments";
 import { SectionsAdmin, StudentsAdmin } from "@/sections/admin/components/students-sections";
 import type { ApiAssessmentQuestion, ApiRole, ApiSection, ApiUser } from "@/types/api";
 import type {
@@ -41,7 +43,7 @@ export function AdminSection({
   const [apiRoles, setApiRoles] = useState<ApiRole[]>([]);
   const [apiPermissions, setApiPermissions] = useState<string[]>([]);
   const [roles, setRoles] = useState<CoordinatorRole[]>(coordinatorRoles);
-  const [tasks, setTasks] = useState<AdminTask[]>(adminTasks);
+  const [tasks] = useState<AdminTask[]>(adminTasks);
   const [assessments, setAssessments] = useState<AdminAssessment[]>(adminAssessments);
   const [apiSections, setApiSections] = useState<ApiSection[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
@@ -251,24 +253,14 @@ export function AdminSection({
     }
   }
 
-  function addTask(task: AdminTask) {
-    setTasks((items) => [task, ...items]);
-    onAction("Task created and preview updated.");
-  }
-
-  function addAssessment(assessment: AdminAssessment) {
-    setAssessments((items) => [assessment, ...items]);
-    onAction("Assessment created. Preview is ready.");
-  }
-
-  async function createValidatedAssessment(payload: AdminAssessment & { questions?: Array<{ id: string; type: string; text: string; options: string[]; marks: string; correctAnswer?: string }> }) {
+  async function createValidatedAssessment(payload: AdminAssessment & { difficulty?: string; attemptsAllowed?: number; questions?: Array<{ id: string; type: string; text: string; options: string[]; marks: string; correctAnswer?: string }> }) {
     const organizationId = getOrganizationId(currentUser?.organization);
-    const assignedSection = apiSections.find((section) => section.name === payload.assignedTo);
+    const assignedSection = apiSections.find((section) => section._id === payload.assignedTo);
     const questions: ApiAssessmentQuestion[] = (payload.questions ?? []).map((question) => ({
       type: question.type === "MCQ" ? "single-choice" : question.type === "Short Answer" ? "short-answer" : question.type === "Code Question" ? "coding" : "long-answer",
       text: question.text,
       options: question.options,
-      correctAnswer: question.correctAnswer || question.options[0] || null,
+      correctAnswer: question.correctAnswer || null,
       marks: Number(question.marks),
       negativeMarks: 0,
     }));
@@ -278,12 +270,12 @@ export function AdminSection({
       title: payload.title,
       description: payload.type,
       category: payload.type,
-      difficulty: "intermediate" as const,
+      difficulty: (payload.difficulty || "intermediate") as "beginner" | "intermediate" | "advanced",
       instructions: payload.instructions,
       durationMinutes: Number.parseInt(payload.duration, 10) || 60,
       totalMarks,
       passingMarks: Math.ceil(totalMarks * 0.4),
-      attemptsAllowed: 1,
+      attemptsAllowed: payload.attemptsAllowed || 1,
       negativeMarking: false,
       shuffleQuestions: false,
       shuffleOptions: false,
@@ -295,17 +287,14 @@ export function AdminSection({
       status: "draft" as const,
     };
 
-    try {
+    {
       const validation = await validateAssessment(apiPayload);
       if (!validation.valid) {
-        onAction(validation.errors.join("; "));
-        return;
+        throw new Error(validation.errors.join("; "));
       }
       const response = await createAssessmentRecord(apiPayload);
       await refreshOrganizationWork();
       onAction(response.message || "Assessment created and validated.");
-    } catch (error) {
-      onAction(error instanceof Error ? error.message : "Assessment validation failed.");
     }
   }
 
@@ -366,17 +355,17 @@ export function AdminSection({
   }
 
   if (activeNav === "Tasks") {
-    return <TasksAdmin tasks={tasks} sections={sections} onAddTask={addTask} />;
+    return <WorkAdmin sections={sections} />;
   }
 
   if (activeNav === "Assessments") {
-    return <AssessmentsAdmin assessments={assessments} sections={sections} onAddAssessment={addAssessment} onCreateValidatedAssessment={createValidatedAssessment} loading={workLoading} />;
+    return <AssessmentsAdmin assessments={assessments} sections={sections} onCreateValidatedAssessment={createValidatedAssessment} loading={workLoading} onPublish={async id => { await updateAssessment(id, { status: "active" }); await refreshOrganizationWork(); onAction("Assessment published. Students will receive a notification."); }} />;
   }
 
-  if (activeNav === "Announcements") return <AnnouncementsAdmin onAction={onAction} sections={sections} />;
+  if (activeNav === "Announcements") return <WorkAdmin key="announcements" sections={sections} initialKind="announcement" />;
   if (activeNav === "Reports") return <ReportsAdmin sections={sections} students={students} />;
   if (activeNav === "Settings") return <SettingsAdmin onAction={onAction} />;
-  if (activeNav === "Groups") return <GroupsAdmin onAction={onAction} />;
+  if (activeNav === "Groups") return <GroupsAdmin students={students} />;
 
   return <AdminDashboard sections={sections} students={students} coordinators={coordinators} tasks={tasks} assessments={assessments} loading={usersLoading || workLoading} loadError={loadError} onAction={onAction} />;
 }

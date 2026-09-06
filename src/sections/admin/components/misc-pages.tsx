@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, Layers, Plus, Send, Users } from "lucide-react";
+import { BarChart3, Layers, Users } from "lucide-react";
 import { ChangePasswordCard } from "@/components/common/change-password-card";
 import { EmptyState } from "@/components/common/empty-state";
 import { InfoTile } from "@/components/common/admin-primitives";
@@ -10,43 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { AdminStudentRow, SectionRow } from "@/types/admin";
-
-export function AnnouncementsAdmin({ onAction, sections }: { onAction: (message: string) => void; sections: SectionRow[] }) {
-  return (
-    <>
-      <SectionIntro
-        eyebrow="Announcements"
-        title="Publish placement updates to sections and groups."
-        description="Send drive updates, schedule changes, preparation instructions, and deadline reminders."
-        action={
-          <Button onClick={() => onAction("Announcement published.")}>
-            <Send className="h-4 w-4" />
-            Publish
-          </Button>
-        }
-      />
-      <Card>
-        <CardContent className="space-y-3 p-4 sm:p-5">
-          <Input placeholder="Announcement title" />
-          <textarea className="min-h-36 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" placeholder="Write announcement content" />
-          <div className="grid gap-3 sm:grid-cols-3">
-            <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm">
-              {sections.map((section) => <option key={section.id}>{section.name}</option>)}
-              <option>All Students</option>
-              <option>Coding Group</option>
-            </select>
-            <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm">
-              <option>Normal</option>
-              <option>Important</option>
-              <option>Urgent</option>
-            </select>
-            <Button onClick={() => onAction("Announcement preview opened.")}>Preview</Button>
-          </div>
-        </CardContent>
-      </Card>
-    </>
-  );
-}
 
 export function ReportsAdmin({ sections, students }: { sections: SectionRow[]; students: AdminStudentRow[] }) {
   const placedStudents = students.filter((student) => student.placementStatus === "Placed");
@@ -199,26 +162,6 @@ export function PlacementStudentList({
         )}
       </CardContent>
     </Card>
-  );
-}
-
-export function GroupsAdmin({ onAction }: { onAction: (message: string) => void }) {
-  return (
-    <>
-      <SectionIntro
-        eyebrow="Groups"
-        title="Create cross-section preparation groups."
-        description="Groups can include students from multiple sections for aptitude, coding, interview, or company-specific support."
-        action={<Button onClick={() => onAction("Group created.")}><Plus className="h-4 w-4" />New Group</Button>}
-      />
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card className="md:col-span-3">
-          <CardContent className="p-4 sm:p-5">
-            <EmptyState icon={Users} title="No groups yet" description="Create groups after students and sections are ready." />
-          </CardContent>
-        </Card>
-      </section>
-    </>
   );
 }
 
