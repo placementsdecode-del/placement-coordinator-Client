@@ -10,6 +10,7 @@ export type ApiUser = {
   department?: string;
   batch?: string;
   section?: string | ApiSection | null;
+  cohorts?: string[];
   groups?: string[];
   preparationScore?: number;
   role: ApiRoleName;
@@ -110,6 +111,7 @@ export type ApiAssessment = {
   instructions: string;
   durationMinutes: number;
   totalMarks: number;
+  rubric?: string;
   passingMarks: number;
   attemptsAllowed: number;
   negativeMarking: boolean;
@@ -117,6 +119,7 @@ export type ApiAssessment = {
   shuffleOptions: boolean;
   showResultImmediately: boolean;
   allowAnswerReview: boolean;
+  assignedGroups?: { _id: string; name: string }[];
   assignedSections: ApiSection[];
   assignedTeachers: ApiUser[];
   questions: ApiAssessmentQuestion[];

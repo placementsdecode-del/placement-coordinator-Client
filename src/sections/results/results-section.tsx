@@ -10,7 +10,7 @@ export function ResultsSection() {
   return (
     <>
       <SectionIntro
-        eyebrow="Results"
+        eyebrow="Progress"
         title="Scores, ranks, feedback, and performance history."
         description="Review assessment outcomes, coordinator feedback, strengths, weak areas, and downloadable result summaries."
         action={

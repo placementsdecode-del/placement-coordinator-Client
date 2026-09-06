@@ -14,5 +14,6 @@ export const getAssessmentCatalog = () => apiFetch<AssessmentCatalog>('/api/read
 export const startAssessmentAttempt = (id: string) => apiFetch<{ attempt: Attempt }>(`/api/readiness/assessments/${id}/start`, { method: 'POST' });
 export const saveAssessmentAnswers = (attempt: Attempt, answers: Attempt['answers']) => apiFetch(`/api/readiness/attempts/${attempt.ledgerId}/${attempt.id}/answers`, { method: 'PATCH', body: JSON.stringify({ answers }) });
 export const submitAssessmentAttempt = (attempt: Attempt, answers: Attempt['answers']) => apiFetch<{ attempt: Attempt }>(`/api/readiness/attempts/${attempt.ledgerId}/${attempt.id}/submit`, { method: 'POST', body: JSON.stringify({ answers }) });
-export const getAssessmentReviews = () => apiFetch<{ attempts: Attempt[] }>('/api/readiness/reviews');
+export const getAssessmentReviews = () => apiFetch<{ attempts: Attempt[]; roster: { assessmentId: string; students: NonNullable<Attempt['student']>[] }[] }>('/api/readiness/reviews');
 export const reviewAssessmentAttempt = (attempt: Attempt, marks: number[], rubric: string, feedback: string) => apiFetch(`/api/readiness/attempts/${attempt.ledgerId}/${attempt.id}/review`, { method: 'POST', body: JSON.stringify({ marks, rubric, feedback }) });
+export const getLeaderboard = () => apiFetch<{ sections: { _id: string; name: string }[]; rows: { id: string; name: string; cohortIds: string[]; assessments: number; score: number }[] }>('/api/readiness/leaderboard');

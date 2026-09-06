@@ -1,3 +1,5 @@
+import { CohortLeaderboard } from "@/components/common/cohort-leaderboard";
+import { StudentOverview } from "@/sections/dashboard/student-overview";
 import { notifyCommunityChanged } from "@/sections/community/community-events";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { AdminShell } from "@/components/layout/admin-shell";
@@ -56,7 +58,9 @@ function slugForNav(label: string) {
 function navFromPath<T extends string>(basePath: string, labels: T[], fallback: T): T {
   const segment = window.location.pathname.replace(basePath, "").split("/").filter(Boolean)[0];
   if (!segment) return fallback;
-  return labels.find((label) => slugForNav(label) === segment) ?? fallback;
+  const aliases: Record<string, string> = { 'my-section': 'my-cohorts', sections: 'cohorts', results: 'progress', 'preparation-progress': 'progress', 'assigned-work': 'assessments', activities: 'tasks-and-activities', 'daily-tasks': 'tasks-and-activities', 'placement-homework': 'tasks-and-activities', announcements: basePath === '/student' ? 'tasks-and-activities' : 'tasks', reports: 'readiness' };
+  const canonical = aliases[segment] || segment;
+  return labels.find((label) => slugForNav(label) === canonical) ?? fallback;
 }
 
 function pathForNav(role: UserRole, label: string) {
@@ -139,6 +143,15 @@ function App() {
     window.history.pushState({}, "", pathForNav("super-admin", nav));
   }
 
+  useEffect(() => {
+    const sync = () => {
+      setActiveNav(navFromPath('/student', navItems.map(item => item.label), 'Dashboard'));
+      setActiveAdminNav(navFromPath(userRole === 'teacher' ? '/teacher' : '/admin', adminNavItems.map(item => item.label), 'Dashboard'));
+    };
+    window.addEventListener('popstate', sync);
+    return () => window.removeEventListener('popstate', sync);
+  }, [userRole]);
+
   function logout() {
     clearAccessToken();
     setCurrentUser(null);
@@ -151,13 +164,13 @@ function App() {
 
   function renderSection() {
     switch (activeNav) {
-      case "My Section": return <MySection />;
+      case "My Cohorts": return <MySection />;
       case "My Groups": return <MyGroups onChanged={notifyCommunityChanged} />;
-      case "Assigned Work": return <MyAssignedWork />;
+      case "Assigned Work": return <AssessmentAttempts />;
       case "Activities":
         return <MyAssignedWork kind="activity" />;
-      case "Daily Tasks":
-        return <MyAssignedWork kind="task" />;
+      case "Tasks & Activities":
+        return <MyAssignedWork />;
       case "Placement Homework":
         return <MyAssignedWork kind="homework" />;
       case "Study Materials":
@@ -169,16 +182,16 @@ function App() {
       case "Self-Assessment":
         return <SelfAssessmentSection onLaunch={(title) => showToast(`${title} launched.`)} />;
       case "Assessments": return <AssessmentAttempts />;
-      case "Results":
-        return <StudentReadiness />;
+      case "Progress":
+        return <><StudentReadiness /><CohortLeaderboard /></>;
       case "Announcements":
         return <MyAssignedWork kind="announcement" />;
       case "Preparation Progress":
-        return <StudentReadiness />;
+        return <><StudentReadiness /><CohortLeaderboard /></>;
       case "Profile":
         return <ProfileSection mustChangePassword={currentUser?.mustChangePassword} />;
       default:
-        return <StudentReadiness />;
+        return <StudentOverview onNavigate={changeStudentNav} />;
     }
   }
 
@@ -232,6 +245,7 @@ function App() {
   if (userRole === "admin" || userRole === "teacher") {
     return (
       <AdminShell
+        role={currentUser?.role}
         activeNav={activeAdminNav}
         mobileMenuOpen={mobileMenuOpen}
         toastMessage={toastMessage}
@@ -241,7 +255,7 @@ function App() {
         onLogout={logout}
         onDismissToast={() => setToastMessage("")}
       >
-        <Suspense fallback={<PageSkeleton />}>{["Dashboard", "Readiness"].includes(activeAdminNav) ? <CoordinatorReadiness /> : <AdminSection activeNav={activeAdminNav} currentUser={currentUser} onAction={showToast} />}</Suspense>
+        <Suspense fallback={<PageSkeleton />}>{activeAdminNav === "Readiness" ? <><CoordinatorReadiness /><CohortLeaderboard /></> : <AdminSection activeNav={activeAdminNav} currentUser={currentUser} onAction={showToast} />}</Suspense>
       </AdminShell>
     );
   }

@@ -1,4 +1,4 @@
-import { Users, Activity, Bell, BookOpenCheck, CalendarDays, ClipboardCheck, Code2, Compass, Library, LayoutDashboard, LineChart, ListChecks, Trophy, UserRound } from "lucide-react";
+import { Users, CalendarDays, ClipboardCheck, Code2, Compass, Library, LayoutDashboard, ListChecks, Trophy, UserRound } from "lucide-react";
 import type {
   ActivityItem,
   AnnouncementItem,
@@ -20,25 +20,20 @@ import type {
 
 export const navItems: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard },
-  { label: "My Section", icon: Users },
+  { label: "My Cohorts", icon: Users },
   { label: "My Groups", icon: Users },
-  { label: "Assigned Work", icon: ListChecks },
-  { label: "Activities", icon: Activity },
-  { label: "Daily Tasks", icon: ListChecks },
-  { label: "Placement Homework", icon: BookOpenCheck },
+  { label: "Assessments", icon: CalendarDays },
+  { label: "Tasks & Activities", icon: ListChecks },
+  { label: "Self-Assessment", icon: ClipboardCheck },
+  { label: "Coding Practice", icon: Code2 },
+  { label: "Progress", icon: Trophy },
+  { label: "Profile", icon: UserRound },
   { label: "Study Materials", icon: Library },
   { label: "Career Roadmaps", icon: Compass },
-  { label: "Coding Practice", icon: Code2 },
-  { label: "Self-Assessment", icon: ClipboardCheck },
-  { label: "Assessments", icon: CalendarDays },
-  { label: "Results", icon: Trophy },
-  { label: "Announcements", icon: Bell },
-  { label: "Preparation Progress", icon: LineChart },
-  { label: "Profile", icon: UserRound },
 ];
 
 export const mobileNavItems = navItems.filter((item) =>
-  ["Dashboard", "Daily Tasks", "Study Materials", "Assessments", "Profile"].includes(item.label),
+  ["Dashboard", "Tasks & Activities", "Study Materials", "Assessments", "Profile"].includes(item.label),
 );
 
 export const stats: StatItem[] = [];

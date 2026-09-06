@@ -2,9 +2,10 @@ import { API_ENDPOINTS } from "@/constants/api";
 import { apiFetch } from "@/services/api-client";
 import type { ApiAssessment } from "@/types/api";
 
-export type AssessmentPayload = Omit<ApiAssessment, "_id" | "organization" | "assignedSections" | "assignedTeachers"> & {
+export type AssessmentPayload = Omit<ApiAssessment, "_id" | "organization" | "assignedSections" | "assignedTeachers" | "assignedGroups"> & {
   organization?: string;
   assignedSections?: string[];
+  assignedGroups?: string[];
   assignedTeachers?: string[];
 };
 

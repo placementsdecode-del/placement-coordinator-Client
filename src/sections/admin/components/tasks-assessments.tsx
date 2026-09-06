@@ -1,3 +1,7 @@
+import { listGroups } from '@/services/groups.api.service';
+import { useCommunityData } from '@/sections/community/use-community-data';
+import { AssessmentReviewQueue } from '@/sections/readiness/assessment-attempts';
+import { Breadcrumbs } from '@/components/common/breadcrumbs';
 import { useState } from "react";
 import { FileText, LoaderCircle, Plus } from "lucide-react";
 import { EmptyState } from "@/components/common/empty-state";
@@ -19,10 +23,13 @@ export function AssessmentsAdmin({
 }: {
   assessments: AdminAssessment[];
   sections: SectionRow[];
-  onCreateValidatedAssessment: (assessment: AdminAssessment & { difficulty?: string; attemptsAllowed?: number; questions: Array<{ id: string; type: string; text: string; options: string[]; marks: string; correctAnswer?: string }> }) => Promise<void>;
+  onCreateValidatedAssessment: (assessment: AdminAssessment & { difficulty?: string; attemptsAllowed?: number; passingPercentage?: number; questions: Array<{ id: string; type: string; text: string; options: string[]; marks: string; correctAnswer?: string }> }) => Promise<void>;
   loading: boolean;
   onPublish: (id: string) => Promise<void>;
 }) {
+  const { data: groupData } = useCommunityData(listGroups);
+  const [opened, setOpened] = useState("");
+  const [creating, setCreating] = useState(false);
   const [publishing, setPublishing] = useState("");
   const [publishError, setPublishError] = useState("");
   const [title, setTitle] = useState("");
@@ -33,6 +40,7 @@ export function AssessmentsAdmin({
   const [duration, setDuration] = useState("60");
   const [attemptsAllowed, setAttemptsAllowed] = useState("1");
   const [correctAnswer, setCorrectAnswer] = useState("");
+  const [passingPercentage, setPassingPercentage] = useState("40");
   const [rubric, setRubric] = useState("");
   const [questionType, setQuestionType] = useState("MCQ");
   const [questionText, setQuestionText] = useState("");
@@ -75,6 +83,7 @@ export function AssessmentsAdmin({
 
   function validateAssessmentForm() {
     const nextErrors: Record<string, string> = {};
+    if (!Number.isFinite(Number(passingPercentage)) || Number(passingPercentage) < 0 || Number(passingPercentage) > 100 || !passingPercentage.trim()) nextErrors.questions = "Pass percentage must be between 0 and 100.";
     if (!type.trim()) nextErrors.title = "Assessment skill is required.";
     if (!Number.isInteger(Number(duration)) || Number(duration) < 1 || Number(duration) > 600) nextErrors.questions = "Duration must be 1–600 minutes.";
     if (!Number.isInteger(Number(attemptsAllowed)) || Number(attemptsAllowed) < 1 || Number(attemptsAllowed) > 20) nextErrors.questions = "Attempts must be 1–20.";
@@ -90,10 +99,13 @@ export function AssessmentsAdmin({
     <>
       <SectionIntro
         eyebrow="Assessments"
-        title="Create assessments and preview the student experience before publishing."
+        title="Assessments"
+        action={<Button onClick={() => { setCreating(v => !v); setOpened(""); }}>{creating ? "Close builder" : "Create assessment"}</Button>}
         description="Build written tests, mock interviews, group discussions, coding rounds, and company-specific assessments."
       />
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+      {!opened && <Breadcrumbs items={[{ label: "Assessments", onClick: opened ? () => setOpened("") : undefined }, ...(opened ? [{ label: assessments.find(a => a.id === opened)?.title || "Assessment" }] : [])]} />}
+      {opened && <AssessmentReviewQueue key={opened} assessmentId={opened} title={assessments.find(a => a.id === opened)?.title} onBack={() => setOpened("")} />}
+      {creating && <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <Card>
           <CardHeader>
             <CardTitle>Create Assessment</CardTitle>
@@ -106,26 +118,23 @@ export function AssessmentsAdmin({
               <FieldError message={errors.title} />
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
-              <label className="text-sm font-medium">Assessment skill<Input aria-label="Assessment skill" placeholder="coding, aptitude, dsa, communication…" value={type} onChange={event => setType(event.target.value)} /></label>
+              <label className="text-sm font-medium">Assessment skill<Input aria-label="Assessment skill" placeholder="DSA, MCAT, medical entrance, competitive exams…" value={type} onChange={event => setType(event.target.value)} /></label>
 
               <div className="space-y-1">
               <select className="h-11 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)}>
+                <option value="">Select a cohort or group</option>
+                {groupData?.groups.map(g => <option key={g._id} value={`group:${g._id}`}>Group · {g.name}</option>)}
                 {sections.map((section) => <option key={section.id} value={section.id}>{section.name} · {section.code}</option>)}
-                <option>Aptitude Group</option>
-                <option>Interview Group</option>
+
               </select>
               <FieldError message={errors.assignedTo} />
               </div>
-              <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm">
-                <option>60 min</option>
-                <option>30 min</option>
-                <option>45 min</option>
-                <option>Panel slot</option>
-              </select>
+
             </div>
             <textarea className="min-h-28 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" placeholder="Instructions students should read before starting" value={instructions} onChange={(event) => setInstructions(event.target.value)} />
             <FieldError message={errors.instructions} />
-            <Input placeholder="Rubric or passing criteria" value={rubric} onChange={(event) => setRubric(event.target.value)} />
+            <label className="block text-sm font-medium">Pass percentage<Input type="number" min="0" max="100" value={passingPercentage} onChange={e => setPassingPercentage(e.target.value)} /></label>
+            <Input placeholder="Grading rubric" maxLength={5000} value={rubric} onChange={(event) => setRubric(event.target.value)} />
             <div className="rounded-lg border bg-background p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-semibold">Question Builder</p>
@@ -181,10 +190,11 @@ export function AssessmentsAdmin({
               disabled={submitting}
               onClick={async () => {
                 if (!validateAssessmentForm()) return;
-                const assessment = { id: crypto.randomUUID(), title: previewTitle, type, assignedTo, duration: `${duration} min`, difficulty, attemptsAllowed: Number(attemptsAllowed), instructions, rubric, status: `Draft · ${questions.length} ${questions.length === 1 ? "question" : "questions"}`, questions };
+                const assessment = { id: crypto.randomUUID(), title: previewTitle, type, assignedTo, duration: `${duration} min`, difficulty, attemptsAllowed: Number(attemptsAllowed), passingPercentage: Number(passingPercentage), instructions, rubric, status: `Draft · ${questions.length} ${questions.length === 1 ? "question" : "questions"}`, questions };
                 setSubmitting(true);
                 try {
                   await onCreateValidatedAssessment(assessment);
+                  setCreating(false); setTitle(""); setQuestions([]);
                 } catch (error) {
                   setErrors(current => ({ ...current, questions: error instanceof Error ? error.message : "Unable to create assessment." }));
                 } finally {
@@ -200,28 +210,29 @@ export function AssessmentsAdmin({
           </CardContent>
         </Card>
         <AssessmentPreview title={previewTitle} type={type} assignedTo={sections.find(section => section.id === assignedTo)?.name || "Unassigned"} instructions={instructions} rubric={rubric} questions={questions} />
-      </section>
-      <Card>
+      </section>}
+      {!opened && <Card>
         <CardHeader>
           <CardTitle>Assessment Board</CardTitle>
           <CardDescription>Created assessments and publish state.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {publishError && <p role="alert" className="text-destructive">{publishError}</p>}
           {loading ? <SkeletonRows rows={3} /> : assessments.length ? assessments.map((assessment) => (
             <div key={assessment.id} className="rounded-lg border p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold">{assessment.title}</p>
+                <button className="text-left font-semibold hover:text-primary" onClick={() => setOpened(assessment.id)}>{assessment.title}</button>
                 <Badge variant="outline">{assessment.status}</Badge>
                 {assessment.status.startsWith("draft") && <Button disabled={!!publishing} onClick={async () => { setPublishing(assessment.id); setPublishError(""); try { await onPublish(assessment.id); } catch (error) { setPublishError(error instanceof Error ? error.message : "Unable to publish."); } finally { setPublishing(""); } }}>{publishing === assessment.id ? "Publishing…" : "Publish and notify"}</Button>}
               </div>
+              <Button variant="outline" className="my-3 w-full" onClick={() => setOpened(assessment.id)}>Open submissions</Button>
               <p className="mt-1 text-sm text-muted-foreground">{assessment.type} · {assessment.assignedTo} · {assessment.duration}</p>
             </div>
           )) : (
             <EmptyState icon={FileText} title="No assessments yet" description="Create and validate an assessment before publishing it to students." />
           )}
         </CardContent>
-      </Card>
+      </Card>}
     </>
   );
 }
@@ -251,7 +262,7 @@ export function AssessmentPreview({
         <div className="rounded-lg border bg-primary/5 p-4">
           <Badge>{type}</Badge>
           <h3 className="mt-3 text-lg font-bold">{title}</h3>
-          <p className="mt-2 text-sm text-muted-foreground">{assignedTo} · 60 min · Starts after publish</p>
+          <p className="mt-2 text-sm text-muted-foreground">{assignedTo} · Starts after publish</p>
         </div>
         <div className="rounded-lg border p-3">
           <p className="text-sm font-semibold">Instructions</p>
@@ -286,10 +297,7 @@ export function AssessmentPreview({
             ) : null}
           </div>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <Button variant="outline">Preview Student Start Screen</Button>
-          <Button>Publish Assessment</Button>
-        </div>
+
       </CardContent>
     </Card>
   );

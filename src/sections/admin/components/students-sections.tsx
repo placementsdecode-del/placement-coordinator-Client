@@ -1,7 +1,12 @@
-import { useState } from "react";
-import { Eye, Layers, Plus, UserPlus, Users } from "lucide-react";
-import { InfoTile, ReadinessPill } from "@/components/common/admin-primitives";
-import { DonutProgress } from "@/components/common/donut-progress";
+import { getReadiness } from '@/services/readiness.api.service';
+import { useCommunityData } from '@/sections/community/use-community-data';
+import { ReadinessView } from '@/sections/readiness/readiness-view';
+import { Breadcrumbs } from '@/components/common/breadcrumbs';
+import { InfoTip } from '@/components/common/info-tip';
+import type { ApiUser } from '@/types/api';
+import { addCohortMember, removeCohortMember } from '@/services/sections.api.service';
+import { useCallback, useState } from "react";
+import { Plus, UserPlus, Users } from "lucide-react";
 import { EmptyState } from "@/components/common/empty-state";
 import { SkeletonRows } from "@/components/common/loading-state";
 import { SectionIntro } from "@/components/common/section-intro";
@@ -44,36 +49,18 @@ export function StudentDetail({
               <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
                 <p>Email: {student.email}</p>
                 <p>Phone: {student.phone}</p>
-                <p>Groups: {student.groups}</p>
-                <p>Pending work: {student.pending}</p>
               </div>
             </>
           ) : (
             <p className="text-sm text-muted-foreground">No student selected.</p>
           )}
         </div>
-        {student ? <div className="grid grid-cols-2 gap-3">
-          {[
-            ["Aptitude", student.aptitude],
-            ["Coding", student.coding],
-            ["Communication", student.communication],
-            ["Interview", student.interview],
-            ["Overall readiness", student.readiness],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded-lg border bg-white p-3">
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <p className="text-xl font-bold">{value}%</p>
-                <ReadinessPill value={Number(value)} />
-              </div>
-            </div>
-          ))}
-        </div> : null}
+        {student && <StudentProgress key={student.id} id={student.id} />}
         {student ? <div className="space-y-2">
-          <label className="text-sm font-medium">Move to section</label>
+          <label className="text-sm font-medium">Primary cohort</label>
           <select
             className="h-11 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
-            aria-label="Student section"
+            aria-label="Primary cohort"
             value={student.sectionId || ""}
             disabled={moving}
             onChange={async (event) => {
@@ -99,6 +86,12 @@ export function StudentDetail({
       </CardContent>
     </Card>
   );
+}
+
+function StudentProgress({ id }: { id: string }) {
+  const load = useCallback(() => getReadiness({}, id), [id]);
+  const { data, error, refresh } = useCommunityData(load);
+  return data ? <ReadinessView report={data} /> : error ? <p role="alert">{error} <button onClick={refresh}>Retry</button></p> : <p>Loading progress…</p>;
 }
 
 export function StudentsAdmin({
@@ -142,7 +135,7 @@ export function StudentsAdmin({
       <SectionIntro
         eyebrow="Students"
         title="Students"
-        description="Filter by section, open a student profile, review progress, and move students between sections."
+        description="Filter by cohort, open a student profile, review progress, and move students between sections."
         action={
           canManage ? <Button onClick={() => setShowCreate((value) => !value)}>
             <UserPlus className="h-4 w-4" />
@@ -160,7 +153,7 @@ export function StudentsAdmin({
             </div>
             <select
               className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm md:w-72"
-              aria-label="Filter by section"
+              aria-label="Filter by cohort"
               value={sectionFilter}
               onChange={(event) => setSectionFilter(event.target.value)}
             >
@@ -183,10 +176,10 @@ export function StudentsAdmin({
               >
                 <div className="min-w-0">
                   <p className="font-semibold">{student.name}</p>
-                  <p className="text-sm text-muted-foreground">{student.rollNo} · {student.groups}</p>
+                  <p className="text-sm text-muted-foreground">{student.rollNo} · {student.email}</p>
                 </div>
-                <DonutProgress value={student.readiness} label="Readiness" size="sm" />
-                <Badge variant={student.pending > 4 ? "danger" : "outline"}>{student.pending} pending</Badge>
+                <span className="text-sm text-muted-foreground">{student.section}</span>
+                <Badge variant="outline">{student.status}</Badge>
               </button>
             )) : (
               <EmptyState icon={Users} title={students.length ? "No matching students" : "No students yet"} description={students.length ? "Try a different search or section filter." : "Add your first student and assign a section when ready."} />
@@ -200,165 +193,30 @@ export function StudentsAdmin({
 }
 
 
-export function SectionsAdmin({
-  canManage = true,
-  sections,
-  students,
-  selectedSection,
-  selectedStudent,
-  onCreateSection,
-  onUpdateSection,
-  onSelectSection,
-  onSelectStudent,
-  onMoveStudent,
-  onCreateStudent,
-  loading,
-}: {
-  sections: SectionRow[];
-  students: AdminStudentRow[];
-  selectedSection: SectionRow | null;
-  selectedStudent: AdminStudentRow | null;
-  onCreateSection: (section: SectionRow) => Promise<void>;
-  onUpdateSection: (section: SectionRow) => Promise<void>;
-  onSelectSection: (sectionId: string) => void;
-  onSelectStudent: (studentId: string) => void;
-  onMoveStudent: (studentId: string, sectionId: string) => Promise<void>;
-  onCreateStudent: (user: {
-    name: string;
-    email: string;
-    phoneNumber: string;
-    registrationNumber: string;
-    department: string;
-    batch: string;
-    section?: string;
-    password?: string;
-  }) => Promise<void>;
-  loading: boolean;
-  canManage?: boolean;
+export function SectionsAdmin({ sections, students, onCreateSection, onUpdateSection, onCreateStudent, onMoveStudent, canManage = true, faculty, assignments, onAssignCoordinators, onRefresh }: {
+  sections: SectionRow[]; students: AdminStudentRow[]; selectedSection: SectionRow | null; selectedStudent: AdminStudentRow | null;
+  onCreateSection: (section: SectionRow) => Promise<void>; onUpdateSection: (section: SectionRow) => Promise<void>;
+  onSelectSection: (id: string) => void; onSelectStudent: (id: string) => void;
+  onCreateStudent: Parameters<typeof StudentsAdmin>[0]['onCreateStudent']; onMoveStudent: (id: string, sectionId: string) => Promise<void>;
+  loading: boolean; canManage?: boolean; faculty: ApiUser[]; assignments: Record<string, string[]>;
+  onAssignCoordinators: (id: string, teachers: string[]) => Promise<void>; onRefresh: () => Promise<void>;
 }) {
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [assignId, setAssignId] = useState("");
-  const [assigning, setAssigning] = useState(false);
-  const [assignError, setAssignError] = useState("");
-  const [showStudentForm, setShowStudentForm] = useState(false);
-  const sectionStudents = selectedSection ? students.filter((student) => student.sectionId === selectedSection.id) : [];
-
-  return (
-    <>
-      <SectionIntro
-        eyebrow="Sections"
-        title="Sections"
-        description="Open a section to see all students belonging to it, then open student progress or move students between sections."
-        action={
-          canManage ? <Button onClick={() => setShowForm((value) => !value)}>
-            <Plus className="h-4 w-4" />
-            New Section
-          </Button> : null
-        }
-      />
-      {showForm ? <CreateSectionForm onCreateSection={onCreateSection} /> : null}
-      <section className="grid min-w-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)] 2xl:grid-cols-[320px_minmax(0,1fr)_360px]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Sections</CardTitle>
-            <CardDescription>Purpose and student count.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {loading ? <SkeletonRows rows={4} /> : sections.length ? sections.map((section) => (
-              <button
-                key={section.id}
-                className={`w-full rounded-lg border p-3 text-left ${selectedSection?.id === section.id ? "border-primary bg-primary/5" : "bg-white"}`}
-                onClick={() => { onSelectSection(section.id); setEditing(false); setAssignId(""); setAssignError(""); }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-semibold">{section.name}</p>
-                  <Badge variant={section.status === "Active" ? "secondary" : "warning"}>{section.status}</Badge>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">{section.description}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Badge variant="outline">{students.filter((student) => student.sectionId === section.id).length} students</Badge>
-                  <Badge variant="outline">{section.code}</Badge>
-                  <Badge variant="outline">{section.coordinator}</Badge>
-                </div>
-              </button>
-            )) : (
-              <EmptyState icon={Layers} title="No sections yet" description="Create your first section to begin adding students and assigning teachers." />
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>{selectedSection?.name ?? "No section selected"}</CardTitle>
-            <CardDescription>{selectedSection?.description ?? "Create a section to manage students."}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {selectedSection ? <div className="grid gap-3 sm:grid-cols-3">
-              <InfoTile label="Department" value={selectedSection.department} />
-              <InfoTile label="Batch" value={selectedSection.batch} />
-              <InfoTile label="Students" value={String(sectionStudents.length)} />
-            </div> : null}
-            {selectedSection && canManage ? (
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditing((value) => !value)}>Edit section</Button>
-                <Button variant="outline" onClick={() => setShowStudentForm((value) => !value)}>
-                  <UserPlus className="h-4 w-4" />
-                  Add Student
-                </Button>
-              </div>
-            ) : null}
-            {editing && selectedSection ? <CreateSectionForm key={selectedSection.id} initialSection={selectedSection} onCreateSection={async (section) => { await onUpdateSection(section); setEditing(false); }} /> : null}
-            {selectedSection ? <form className="space-y-2 rounded-lg border bg-muted p-4" onSubmit={async (event) => {
-              event.preventDefault();
-              if (!assignId) return;
-              setAssigning(true); setAssignError("");
-              try { await onMoveStudent(assignId, selectedSection.id); setAssignId(""); }
-              catch (error) { setAssignError(error instanceof Error ? error.message : "Unable to assign student."); }
-              finally { setAssigning(false); }
-            }}>
-              <label htmlFor="assign-student" className="block text-sm font-semibold">Assign an existing student</label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <select id="assign-student" className="h-11 min-h-11 min-w-0 sm:flex-1 rounded-md border bg-white px-3 text-sm" value={assignId} onChange={(event) => setAssignId(event.target.value)} disabled={assigning || selectedSection.status !== "Active"}>
-                  <option value="">Select student</option>
-                  {students.filter((student) => student.sectionId !== selectedSection.id).map((student) => <option key={student.id} value={student.id}>{student.name} · {student.rollNo} · {student.section}</option>)}
-                </select>
-                <Button type="submit" disabled={!assignId || assigning || selectedSection.status !== "Active"}>{assigning ? "Assigning…" : "Assign student"}</Button>
-              </div>
-              <p className="text-xs text-muted-foreground">Assigning moves the student from their current section. To remove a student, open their details and select Unassigned.</p>
-              {assignError ? <p role="alert" className="text-sm text-destructive">{assignError}</p> : null}
-            </form> : null}
-            {showStudentForm && selectedSection ? (
-              <CreateStudentForm sections={sections} initialSectionId={selectedSection.id} embedded onCreateStudent={onCreateStudent} />
-            ) : null}
-            {sectionStudents.length > 0 ? sectionStudents.map((student) => (
-              <button
-                key={student.id}
-                className={`grid w-full gap-3 rounded-lg border p-3 text-left md:grid-cols-[minmax(0,1fr)_120px_auto] md:items-center ${
-                  selectedStudent?.id === student.id ? "border-primary bg-primary/5" : "bg-white"
-                }`}
-                onClick={() => onSelectStudent(student.id)}
-              >
-                <div>
-                  <p className="font-semibold">{student.name}</p>
-                  <p className="text-sm text-muted-foreground">{student.rollNo} · {student.email}</p>
-                </div>
-                <div>
-                  <p className="mb-2 text-xs text-muted-foreground">{student.readiness}% ready</p>
-                  <ReadinessPill value={student.readiness} />
-                </div>
-                <Eye className="h-4 w-4 text-primary" />
-              </button>
-            )) : (
-              <EmptyState icon={Users} title="No students in this section" description="Add students or move existing students into this section." />
-            )}
-          </CardContent>
-        </Card>
-        <div className="2xl:block lg:col-span-2 2xl:col-span-1">
-          <StudentDetail student={selectedStudent} sections={sections} onMoveStudent={onMoveStudent} />
-        </div>
-      </section>
-    </>
-  );
+  const [opened, setOpened] = useState(''); const [studentId, setStudentId] = useState(''); const [creating, setCreating] = useState(false); const [editing, setEditing] = useState(false);
+  const [adding, setAdding] = useState(false); const [assignId, setAssignId] = useState(''); const [pending, setPending] = useState(false); const [error, setError] = useState('');
+  const cohort = sections.find(s => s.id === opened); const student = students.find(s => s.id === studentId);
+  const belongs = (s: AdminStudentRow) => s.sectionId === opened || s.cohortIds?.includes(opened);
+  const members = students.filter(belongs);
+  async function run(action: () => Promise<void>) { setPending(true); setError(''); try { await action(); } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save'); } finally { setPending(false); } }
+  return <><SectionIntro eyebrow="Learning community" title={cohort?.name || 'Cohorts'} description="Organize students by learning purpose and assign faculty to guide each cohort." action={canManage && !opened ? <Button onClick={() => setCreating(v => !v)}><Plus className="h-4 w-4" />Create cohort</Button> : undefined} />
+    <Breadcrumbs items={[{ label: 'Cohorts', onClick: opened ? () => { setOpened(''); setStudentId(''); setEditing(false); setAdding(false); } : undefined }, ...(cohort ? [{ label: cohort.name, onClick: student ? () => setStudentId('') : undefined }] : []), ...(student ? [{ label: student.name }] : [])]} />
+    {error && <p role="alert" className="text-destructive">{error}</p>}
+    {creating && !opened && <CreateSectionForm onCreateSection={async s => { await onCreateSection(s); setCreating(false); }} />}
+    {student && cohort ? <StudentDetail student={student} sections={sections} onMoveStudent={onMoveStudent} /> : cohort ? <>
+      <Card><CardHeader><CardTitle>Coordinators <InfoTip text="Select faculty to monitor this cohort. Assigned coordinators can see its students, publish assessments, and review progress." /></CardTitle><CardDescription>{cohort.description}</CardDescription></CardHeader><CardContent className="space-y-3"><p>{cohort.coordinator}</p>{canManage && <div className="grid gap-2 sm:grid-cols-3">{faculty.map(t => { const id = t.id || t._id || ''; const assigned = assignments[cohort.id] || []; return <label key={id} className="flex gap-2 rounded-lg border p-3 text-sm"><input type="checkbox" checked={assigned.includes(id)} disabled={pending} onChange={e => void run(() => onAssignCoordinators(cohort.id, e.target.checked ? [...assigned, id] : assigned.filter(a => a !== id)))} />{t.name}</label>; })}{!faculty.length && <p>Create a faculty account in Coordinators first.</p>}</div>}</CardContent></Card>
+      <div className="flex flex-wrap gap-2">{canManage && <Button variant="outline" onClick={() => setEditing(v => !v)}>Edit cohort</Button>}<Button variant="outline" onClick={() => setAdding(v => !v)}>Add participants</Button></div>
+      {editing && <CreateSectionForm initialSection={cohort} onCreateSection={async s => { await onUpdateSection(s); setEditing(false); }} />}
+      {adding && <Card><CardContent className="space-y-4 p-5"><form className="flex flex-wrap gap-2" onSubmit={e => { e.preventDefault(); void run(async () => { await addCohortMember(cohort.id, assignId); await onRefresh(); setAssignId(''); }); }}><select aria-label="Student to add" className="h-11 min-w-0 flex-1 rounded-md border px-3" value={assignId} onChange={e => setAssignId(e.target.value)}><option value="">Select a student</option>{students.filter(s => !belongs(s)).map(s => <option key={s.id} value={s.id}>{s.name} · {s.rollNo}</option>)}</select><Button disabled={pending || !assignId}>Add to cohort</Button><InfoTip text="Students can join multiple cohorts. Adding a student here keeps their existing memberships." /></form>{canManage && <CreateStudentForm sections={sections} initialSectionId={cohort.id} embedded onCreateStudent={onCreateStudent} />}</CardContent></Card>}
+      <h2 className="font-semibold">Participants ({members.length})</h2><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{members.map(s => <Card key={s.id}><CardContent className="p-4"><button className="w-full text-left" onClick={() => setStudentId(s.id)}><p className="font-semibold">{s.name}</p><p className="text-sm text-muted-foreground">{s.rollNo}</p></button><Button variant="ghost" disabled={pending} className="mt-2" onClick={() => void run(async () => { await removeCohortMember(cohort.id, s.id); await onRefresh(); })}>Remove from cohort</Button></CardContent></Card>)}</div>{!members.length && <p className="text-muted-foreground">No participants yet. Add students to this cohort.</p>}
+    </> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{sections.map(s => <button key={s.id} onClick={() => setOpened(s.id)} className="rounded-xl border bg-white p-5 text-left hover:border-primary"><h2 className="font-semibold">{s.name}</h2><p className="mt-2 text-sm text-muted-foreground">{s.description}</p><p className="mt-3 text-sm">{students.filter(u => u.sectionId === s.id || u.cohortIds?.includes(s.id)).length} participants · {s.status}</p><p className="mt-1 text-xs text-muted-foreground">{s.coordinator}</p></button>)}</div>}
+  </>;
 }
-
-

@@ -30,12 +30,13 @@ export function mapStudentUser(user: ApiUser, sections: ApiSection[] = []): Admi
       : sections.find((section) => section._id === user.section)?.name ?? "Unassigned";
 
   return {
-    id: user.id,
+    id: user.id || user._id || "",
     name: user.name,
-    rollNo: user.registrationNumber || user.id.slice(-6),
+    rollNo: user.registrationNumber || (user.id || user._id || "").slice(-6),
     email: user.email,
     phone: user.phoneNumber || "",
     section: sectionName,
+    cohortIds: user.cohorts || [],
     sectionId: typeof user.section === "object" && user.section ? user.section._id : user.section || "",
     groups: user.groups?.join(", ") || "General",
     aptitude: user.preparationScore || 0,
@@ -54,7 +55,7 @@ export function mapAssessment(assessment: ApiAssessment): AdminAssessment {
     id: assessment._id,
     title: assessment.title,
     type: assessment.category,
-    assignedTo: assessment.assignedSections.map((section) => section.name).join(", ") || "Unassigned",
+    assignedTo: [...assessment.assignedSections, ...(assessment.assignedGroups || [])].map((section) => section.name).join(", ") || "Unassigned",
     duration: `${assessment.durationMinutes} min`,
     instructions: assessment.instructions,
     rubric: `${assessment.passingMarks}/${assessment.totalMarks} passing`,

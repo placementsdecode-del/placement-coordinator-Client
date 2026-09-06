@@ -1,3 +1,4 @@
+import { Breadcrumbs } from '@/components/common/breadcrumbs';
 import { useLearningTracker } from "@/sections/readiness/learning-tracker";
 import { getMySection } from "@/services/community.api.service";
 import { useCommunityData } from "@/sections/community/use-community-data";
@@ -108,7 +109,7 @@ export function StudentShell({
             </Button>
             <div className="min-w-0">
               <h2 className="truncate text-lg font-semibold">{activeNav}</h2>
-              <button className="block max-w-[45vw] truncate text-left text-xs text-muted-foreground hover:text-primary sm:text-sm" onClick={() => onChangeNav("My Section")}>{community ? community.section ? `${community.section.name} · ${community.section.code}` : "Section unassigned" : "View my section"}</button>
+              <button className="block max-w-[45vw] truncate text-left text-xs text-muted-foreground hover:text-primary sm:text-sm" onClick={() => onChangeNav("My Cohorts")}>{community ? community.section ? `${community.section.name} · ${community.section.code}` : "Section unassigned" : "View my section"}</button>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -119,7 +120,7 @@ export function StudentShell({
           </div>
         </header>
 
-        <div className="space-y-5 p-3 pb-28 pt-20 sm:space-y-6 sm:p-4 sm:pb-28 sm:pt-20 md:p-6 md:pt-20 lg:pb-6">{trackingError && <p role="status" className="text-sm text-amber-700">Learning-time sync failed. Check your connection.</p>}{children}</div>
+        <div className="space-y-5 p-3 pb-28 pt-20 sm:space-y-6 sm:p-4 sm:pb-28 sm:pt-20 md:p-6 md:pt-20 lg:pb-6">{trackingError && <p role="status" className="text-sm text-amber-700">Learning-time sync failed. Check your connection.</p>}{!["Assessments", "Cohorts", "My Cohorts", "Groups", "My Groups"].includes(activeNav) && <Breadcrumbs items={[{ label: "Dashboard", onClick: activeNav !== "Dashboard" ? () => onChangeNav("Dashboard") : undefined }, ...(activeNav !== "Dashboard" ? [{ label: activeNav }] : [])]} />}{children}</div>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-white px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-10px_30px_rgba(31,41,55,0.08)] lg:hidden">

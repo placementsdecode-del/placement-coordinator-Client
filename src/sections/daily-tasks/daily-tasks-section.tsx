@@ -30,7 +30,7 @@ export function DailyTasksSection({
   return (
     <>
       <SectionIntro
-        eyebrow="Daily Tasks"
+        eyebrow="Tasks & Activities"
         title="Today's coordinator-assigned work queue."
         description="Start, submit, comment, upload attachments, and track overdue placement preparation tasks."
         action={

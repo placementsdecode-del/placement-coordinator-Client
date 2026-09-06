@@ -1,11 +1,9 @@
 import {
   BarChart3,
-  Bell,
   BookOpenCheck,
   CalendarDays,
   ClipboardList,
   LayoutDashboard,
-  Megaphone,
   Settings,
   ShieldCheck,
   Users,
@@ -26,12 +24,10 @@ export const adminNavItems: AdminNavItem[] = [
   { label: "Readiness", icon: BarChart3 },
   { label: "Students", icon: Users },
   { label: "Coordinators", icon: ShieldCheck },
-  { label: "Sections", icon: BookOpenCheck },
+  { label: "Cohorts", icon: BookOpenCheck },
   { label: "Groups", icon: ClipboardList },
   { label: "Tasks", icon: CalendarDays },
   { label: "Assessments", icon: BarChart3 },
-  { label: "Announcements", icon: Bell },
-  { label: "Reports", icon: Megaphone },
   { label: "Settings", icon: Settings },
 ];
 

@@ -5,7 +5,7 @@ export type AdminNavLabel =
   | "Readiness"
   | "Students"
   | "Coordinators"
-  | "Sections"
+  | "Cohorts"
   | "Groups"
   | "Tasks"
   | "Assessments"
@@ -45,6 +45,7 @@ export type AdminStudentRow = {
   email: string;
   phone: string;
   section: string;
+  cohortIds?: string[];
   sectionId?: string;
   rollNo: string;
   groups: string;

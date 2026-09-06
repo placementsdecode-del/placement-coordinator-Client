@@ -1,19 +1,19 @@
 import type { LucideIcon } from "lucide-react";
 
 export type NavLabel =
-  | "My Section"
+  | "My Cohorts"
   | "My Groups"
   | "Assigned Work"
   | "Dashboard"
   | "Activities"
-  | "Daily Tasks"
+  | "Tasks & Activities"
   | "Placement Homework"
   | "Study Materials"
   | "Career Roadmaps"
   | "Coding Practice"
   | "Self-Assessment"
   | "Assessments"
-  | "Results"
+  | "Progress"
   | "Announcements"
   | "Preparation Progress"
   | "Profile";

@@ -41,3 +41,5 @@ export function assignStudentToSection(sectionId: string, studentId: string) {
 export function removeStudentFromSection(sectionId: string, studentId: string) {
   return apiFetch<{ message: string }>(API_ENDPOINTS.sections.assignStudent(sectionId, studentId), { method: "DELETE" });
 }
+export const addCohortMember = (cohort: string, student: string) => apiFetch(`/api/sections/${cohort}/members/${student}`, { method: 'POST' });
+export const removeCohortMember = (cohort: string, student: string) => apiFetch(`/api/sections/${cohort}/members/${student}`, { method: 'DELETE' });

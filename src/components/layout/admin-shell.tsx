@@ -1,3 +1,4 @@
+import { Breadcrumbs } from '@/components/common/breadcrumbs';
 import type { ReactNode } from "react";
 import { Bell, LogOut, Menu, X } from "lucide-react";
 import { ActionToast } from "@/components/common/action-toast";
@@ -8,6 +9,7 @@ import { cn } from "@/lib/utils";
 import type { AdminNavLabel } from "@/types/admin";
 
 export function AdminShell({
+  role = "admin",
   activeNav,
   mobileMenuOpen,
   toastMessage,
@@ -18,6 +20,7 @@ export function AdminShell({
   onLogout,
   onDismissToast,
 }: {
+  role?: string;
   activeNav: AdminNavLabel;
   mobileMenuOpen: boolean;
   toastMessage: string;
@@ -41,17 +44,17 @@ export function AdminShell({
         )}
       >
         <div className="flex h-16 items-center justify-between border-b px-5">
-          <BrandLogo subtitle="Admin" />
+          <BrandLogo subtitle={role === "teacher" ? "Coordinator" : "Admin"} />
           <Button className="lg:hidden" variant="ghost" size="icon" onClick={onCloseMenu} aria-label="Close navigation">
             <X className="h-5 w-5" />
           </Button>
         </div>
         <div className="border-b px-5 py-3">
           <p className="text-sm font-bold">Organization Workspace</p>
-          <p className="text-xs text-muted-foreground">Organization Admin</p>
+          <p className="text-xs text-muted-foreground">{role === "teacher" ? "Faculty workspace" : "Organization Admin"}</p>
         </div>
         <nav className="h-[calc(100vh-7.25rem)] space-y-1 overflow-y-auto p-3">
-          {adminNavItems.map((item) => (
+          {adminNavItems.filter(item => role !== "teacher" || !["Coordinators", "Settings"].includes(item.label)).map((item) => (
             <button
               key={item.label}
               aria-current={activeNav === item.label ? "page" : undefined}
@@ -79,11 +82,11 @@ export function AdminShell({
             </Button>
             <div className="min-w-0">
               <h2 className="truncate text-lg font-semibold">{activeNav}</h2>
-              <p className="hidden text-sm text-muted-foreground sm:block">Organization admin console</p>
+              <p className="hidden text-sm text-muted-foreground sm:block">{role === "teacher" ? "Faculty workspace" : "Organization admin console"}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" aria-label="Announcements" onClick={() => onChangeNav("Announcements")}>
+            <Button variant="outline" size="icon" aria-label="Announcements" onClick={() => onChangeNav("Tasks")}>
               <Bell className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={onLogout} aria-label="Logout">
@@ -92,7 +95,7 @@ export function AdminShell({
           </div>
         </header>
         <div className="space-y-5 p-3 pb-28 pt-20 sm:space-y-6 sm:p-4 sm:pb-28 sm:pt-20 md:p-6 md:pt-20 lg:pb-6">
-          {children}
+          {!["Assessments", "Cohorts", "My Cohorts", "Groups", "My Groups"].includes(activeNav) && <Breadcrumbs items={[{ label: "Dashboard", onClick: activeNav !== "Dashboard" ? () => onChangeNav("Dashboard") : undefined }, ...(activeNav !== "Dashboard" ? [{ label: activeNav }] : [])]} />}{children}
         </div>
       </div>
 

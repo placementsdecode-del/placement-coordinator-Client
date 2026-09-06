@@ -112,7 +112,7 @@ export function CreateStudentForm({
             </label>
             <FieldError message={errors.batch} />
           </div>
-          <select aria-label="Student section" className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={form.section} onChange={(event) => setForm((current) => ({ ...current, section: event.target.value }))}>
+          <select aria-label="Primary cohort" className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={form.section} onChange={(event) => setForm((current) => ({ ...current, section: event.target.value }))}>
             <option value="">No section</option>
             {sections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
           </select>
@@ -181,8 +181,8 @@ export function CreateSectionForm({ onCreateSection, initialSection }: { onCreat
             event.preventDefault();
             const sectionName = name.trim();
             const nextErrors: Record<string, string> = {};
-            if (!sectionName) nextErrors.name = "Section name is required.";
-            if (!code.trim()) nextErrors.code = "Section code is required.";
+            if (!sectionName) nextErrors.name = "Cohort name is required.";
+            if (!code.trim()) nextErrors.code = "Cohort code is required.";
             if (!department.trim()) nextErrors.department = "Department is required.";
             if (!batch.trim()) nextErrors.batch = "Batch is required.";
             if (!academicYear.trim()) nextErrors.academicYear = "Academic year is required.";
@@ -212,14 +212,14 @@ export function CreateSectionForm({ onCreateSection, initialSection }: { onCreat
           }}
         >
           <div className="space-y-1">
-            <label className="block space-y-1 text-sm font-medium">Section name
-            <Input placeholder="Section name" value={name} onChange={(event) => setName(event.target.value)} />
+            <label className="block space-y-1 text-sm font-medium">Cohort name
+            <Input placeholder="Cohort name" value={name} onChange={(event) => setName(event.target.value)} />
             </label>
             <FieldError message={errors.name} />
           </div>
           <div className="space-y-1">
-            <label className="block space-y-1 text-sm font-medium">Section code
-            <Input placeholder="Section code" value={code} onChange={(event) => setCode(event.target.value)} />
+            <label className="block space-y-1 text-sm font-medium">Cohort code
+            <Input placeholder="Cohort code" value={code} onChange={(event) => setCode(event.target.value)} />
             </label>
             <FieldError message={errors.code} />
           </div>

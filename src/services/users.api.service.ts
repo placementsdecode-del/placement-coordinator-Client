@@ -36,3 +36,5 @@ export function updateUser(userId: string, payload: Partial<CreateUserPayload> &
     body: JSON.stringify(payload),
   });
 }
+export type BulkImportResult = { row: number; email: string; status: string; temporaryPassword?: string; error?: string };
+export const bulkImportStudents = (students: Record<string, string>[]) => apiFetch<{ results: BulkImportResult[] }>('/api/users/bulk-students', { method: 'POST', body: JSON.stringify({ students }) });

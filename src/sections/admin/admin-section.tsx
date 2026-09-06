@@ -1,3 +1,5 @@
+import { listFaculty } from "@/services/groups.api.service";
+import { BulkStudents } from "./components/bulk-students";
 import { GroupsAdmin } from "@/sections/community/groups-admin";
 import { WorkAdmin } from "@/sections/community/work-admin";
 import { useCallback, useEffect, useState } from "react";
@@ -39,6 +41,7 @@ export function AdminSection({
   const [sections, setSections] = useState<SectionRow[]>([]);
   const [students, setStudents] = useState<AdminStudentRow[]>([]);
   const [coordinators, setCoordinators] = useState<CoordinatorRow[]>(adminCoordinators);
+  const [faculty, setFaculty] = useState<ApiUser[]>([]);
   const [organizationUsers, setOrganizationUsers] = useState<ApiUser[]>([]);
   const [apiRoles, setApiRoles] = useState<ApiRole[]>([]);
   const [apiPermissions, setApiPermissions] = useState<string[]>([]);
@@ -46,10 +49,12 @@ export function AdminSection({
   const [tasks] = useState<AdminTask[]>(adminTasks);
   const [assessments, setAssessments] = useState<AdminAssessment[]>(adminAssessments);
   const [apiSections, setApiSections] = useState<ApiSection[]>([]);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [usersLoading, setUsersLoading] = useState(true);
   const [workLoading, setWorkLoading] = useState(true);
   const [usersError, setUsersError] = useState("");
   const [workError, setWorkError] = useState("");
+  useEffect(() => { if (!usersLoading && !workLoading) setHasLoaded(true); }, [usersLoading, workLoading]);
   const loadError = [usersError, workError].filter(Boolean).join(" ");
   const [selectedSectionId, setSelectedSectionId] = useState(sections[2]?.id ?? sections[0]?.id);
   const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id ?? "");
@@ -61,12 +66,14 @@ export function AdminSection({
     const organizationId = getOrganizationId(currentUser?.organization);
     setUsersLoading(true);
     try {
-      const [users, roleRows, permissionRows] = await Promise.all([
+      const [users, roleRows, permissionRows, facultyRows] = await Promise.all([
         listUsers(organizationId),
         currentUser?.role === "teacher" ? Promise.resolve([]) : listRoles(organizationId),
         currentUser?.role === "teacher" ? Promise.resolve([]) : listPermissions(),
+        listFaculty(),
       ]);
       setOrganizationUsers(users);
+      setFaculty(facultyRows.faculty);
       setApiRoles(roleRows);
       setApiPermissions(permissionRows);
       setUsersError("");
@@ -86,6 +93,7 @@ export function AdminSection({
   }, [refreshOrganizationUsers]);
 
   useEffect(() => {
+    setCoordinators(organizationUsers.filter(u => u.role === 'teacher').map(u => ({ id: u.id, name: u.name, email: u.email, phone: u.phoneNumber || '', role: 'Coordinator', status: u.status === 'active' ? 'Active' : 'Inactive', sections: apiSections.filter(s => s.assignedTeachers.some(t => (t.id || t._id) === u.id)).map(s => s.name) })));
     setStudents(organizationUsers.filter((user) => user.role === "student").map((user) => mapStudentUser(user, apiSections)));
   }, [organizationUsers, apiSections]);
 
@@ -173,7 +181,7 @@ export function AdminSection({
     if (teacher && apiSectionIds.length) {
       await Promise.all(apiSectionIds.map((sectionId) => {
         const section = apiSections.find((item) => item._id === sectionId);
-        const assignedTeachers = new Set(section?.assignedTeachers.map((item) => item.id) ?? []);
+        const assignedTeachers = new Set(section?.assignedTeachers.map((item) => item.id || item._id || "") ?? []);
         assignedTeachers.add(teacher.id);
         return updateSection(sectionId, { assignedTeachers: Array.from(assignedTeachers) });
       }));
@@ -253,7 +261,7 @@ export function AdminSection({
     }
   }
 
-  async function createValidatedAssessment(payload: AdminAssessment & { difficulty?: string; attemptsAllowed?: number; questions?: Array<{ id: string; type: string; text: string; options: string[]; marks: string; correctAnswer?: string }> }) {
+  async function createValidatedAssessment(payload: AdminAssessment & { difficulty?: string; attemptsAllowed?: number; passingPercentage?: number; questions?: Array<{ id: string; type: string; text: string; options: string[]; marks: string; correctAnswer?: string }> }) {
     const organizationId = getOrganizationId(currentUser?.organization);
     const assignedSection = apiSections.find((section) => section._id === payload.assignedTo);
     const questions: ApiAssessmentQuestion[] = (payload.questions ?? []).map((question) => ({
@@ -274,7 +282,8 @@ export function AdminSection({
       instructions: payload.instructions,
       durationMinutes: Number.parseInt(payload.duration, 10) || 60,
       totalMarks,
-      passingMarks: Math.ceil(totalMarks * 0.4),
+      passingMarks: Math.ceil(totalMarks * (payload.passingPercentage ?? 40) / 100),
+      rubric: payload.rubric,
       attemptsAllowed: payload.attemptsAllowed || 1,
       negativeMarking: false,
       shuffleQuestions: false,
@@ -282,6 +291,7 @@ export function AdminSection({
       showResultImmediately: true,
       allowAnswerReview: true,
       assignedSections: assignedSection ? [assignedSection._id] : [],
+      assignedGroups: payload.assignedTo.startsWith("group:") ? [payload.assignedTo.slice(6)] : [],
       assignedTeachers: [],
       questions,
       status: "draft" as const,
@@ -298,12 +308,12 @@ export function AdminSection({
     }
   }
 
-  if (usersLoading || workLoading) return <PageSkeleton label={`Loading ${activeNav.toLowerCase()}`} />;
+  if (!hasLoaded && (usersLoading || workLoading)) return <PageSkeleton label={`Loading ${activeNav.toLowerCase()}`} />;
   if (loadError) return <LoadError message={loadError} onRetry={() => { void refreshOrganizationUsers(); void refreshOrganizationWork(); }} />;
 
   if (activeNav === "Students") {
     return (
-      <StudentsAdmin
+      <><BulkStudents sections={sections} onImported={refreshOrganizationUsers} /><StudentsAdmin
         canManage={currentUser?.role !== "teacher"}
         sections={sections}
         students={students}
@@ -312,13 +322,17 @@ export function AdminSection({
         onCreateStudent={createStudent}
         onMoveStudent={moveStudent}
         loading={usersLoading}
-      />
+      /></>
     );
   }
 
-  if (activeNav === "Sections") {
+  if (activeNav === "Cohorts") {
     return (
       <SectionsAdmin
+        faculty={faculty}
+        assignments={Object.fromEntries(apiSections.map(s => [s._id, s.assignedTeachers.map(t => t.id || t._id || '')]))}
+        onAssignCoordinators={async (id, teachers) => { await updateSection(id, { assignedTeachers: teachers }); await refreshOrganizationWork(); }}
+        onRefresh={refreshOrganizationUsers}
         canManage={currentUser?.role !== "teacher"}
         sections={sections}
         students={students}
@@ -365,7 +379,7 @@ export function AdminSection({
   if (activeNav === "Announcements") return <WorkAdmin key="announcements" sections={sections} initialKind="announcement" />;
   if (activeNav === "Reports") return <ReportsAdmin sections={sections} students={students} />;
   if (activeNav === "Settings") return <SettingsAdmin onAction={onAction} />;
-  if (activeNav === "Groups") return <GroupsAdmin students={students} />;
+  if (activeNav === "Groups") return <GroupsAdmin students={students} faculty={faculty} />;
 
   return <AdminDashboard sections={sections} students={students} coordinators={coordinators} tasks={tasks} assessments={assessments} loading={usersLoading || workLoading} loadError={loadError} onAction={onAction} />;
 }
