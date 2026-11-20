@@ -1,67 +1,122 @@
-import { scoreText } from '@/lib/utils';
-import { useCallback, useEffect, useState } from 'react';
-import { getCohortReadiness, getReadiness, listReadinessPolicies, recordAcademics, recordShortlistDecision } from '@/services/readiness.api.service';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getCohortReadiness, getReadiness, recordAcademics, recordShortlistDecision } from '@/services/readiness.api.service';
 import { useCommunityData } from '@/sections/community/use-community-data';
-import { PageSkeleton, LoadError } from '@/components/common/loading-state';
+import { PageSkeleton, LoadError, SkeletonRows } from '@/components/common/loading-state';
 import { SectionIntro } from '@/components/common/section-intro';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import type { ReadinessQuery, ReadinessReport } from '@/types/readiness';
+import { CohortLeaderboard } from '@/components/common/cohort-leaderboard';
+import { CandidateFilterPanel, ReadinessOverview } from './candidate-filters';
+import { CandidateResults } from './candidate-results';
+import type { CandidateFilters, ReadinessQuery, ReadinessReport } from '@/types/readiness';
 import { FilterBar, ReadinessView, selectClass } from './readiness-view';
 import { EvidenceForm } from './evidence-form';
 import { PolicyEditor } from './policy-editor';
-export function CoordinatorReadiness() {
-  const [studentId, setStudentId] = useState(() => new URLSearchParams(window.location.search).get('student') || '');
-  return studentId ? <StudentDrilldown studentId={studentId} query={{ months: '3' }} onBack={() => {
-    window.history.replaceState({}, '', window.location.pathname);
-    setStudentId('');
-  }} /> : <ReadinessDirectory />;
-}
+const emptyCandidateFilters: CandidateFilters = {
+  search: '', readiness: '', department: '', batch: '', eligibility: '', skill: '', minimum: '',
+};
+const initialQuery: ReadinessQuery = { months: '3' };
+const tabs = ['Overview', 'Record evaluation', 'Scoring policies'] as const;
 
-function ReadinessDirectory() {
-  const [query, setQuery] = useState<ReadinessQuery>({ months: '3' }); const [tab, setTab] = useState('Overview'); const [selected, setSelected] = useState('');
-  const [search, setSearch] = useState(''); const [readiness, setReadiness] = useState(''); const [department, setDepartment] = useState(''); const [batch, setBatch] = useState(''); const [skill, setSkill] = useState(''); const [minimum, setMinimum] = useState(''); const [eligible, setEligible] = useState('');
+export function CoordinatorReadiness() {
+  const [selected, setSelected] = useState(() => new URLSearchParams(window.location.search).get('student') || '');
+  const [query, setQuery] = useState(initialQuery);
+  const [tab, setTab] = useState<(typeof tabs)[number]>('Overview');
+  const [filters, setFilters] = useState(emptyCandidateFilters);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   useEffect(() => {
-    const timer = window.setTimeout(() => setQuery(current => current.search === search ? current : { ...current, search, page: '1' }), 300);
+    const nextSearch = filters.search.trim();
+    if (nextSearch === search) return;
+    const timer = window.setTimeout(() => {
+      setSearch(nextSearch);
+      setPage(1);
+    }, 300);
     return () => window.clearTimeout(timer);
-  }, [search]);
-  const load = useCallback(async () => { const [cohort, policies] = await Promise.all([getCohortReadiness(query), listReadinessPolicies()]); return { ...cohort, policies: policies.policies }; }, [query]);
-  const { data, loading, error, refresh } = useCommunityData(load);
-  if (!data && loading) return <PageSkeleton label="Loading student readiness" />;
-  if (error || !data) return <LoadError message={error || 'Unable to load readiness'} onRetry={refresh} />;
-  const rows = data.students.filter(row => `${row.student.name} ${row.student.registrationNumber}`.toLowerCase().includes(search.toLowerCase()) && (!readiness || row.status === readiness) && (!department || row.student.department === department) && (!batch || row.student.batch === batch) && (!eligible || row.eligibility.status === eligible) && (!skill || minimum === '' || row.skills.some(item => item.key === skill && item.score !== null && item.score >= Number(minimum))));
-  return <><SectionIntro eyebrow="Placement intelligence" title="Student readiness & shortlisting" description="Use demonstrated skills, recent evidence, and role-specific requirements to make accountable placement decisions." action={<Button variant="outline" disabled={loading} onClick={refresh}>Refresh</Button>} />
-    <FilterBar policies={data.policies} query={query} onChange={next => setQuery({ ...next, search, page: '1' })} />
-    <div className="flex flex-wrap items-center gap-3 text-sm">
-      <Button variant="outline" size="sm" disabled={loading || data.page <= 1} onClick={() => setQuery(current => ({ ...current, page: String(data.page - 1) }))}>Previous students</Button>
-      <span>Page {data.page} of {Math.max(1, data.pages)} · {data.total} students</span>
-      <Button variant="outline" size="sm" disabled={loading || data.page >= data.pages} onClick={() => setQuery(current => ({ ...current, page: String(data.page + 1) }))}>Next students</Button>
+  }, [filters.search, search]);
+
+  const minimum = filters.minimum && Number(filters.minimum) >= 0 && Number(filters.minimum) <= 10 ? filters.minimum : '';
+  const scope = useMemo(() => ({
+    ...query, search, department: filters.department,
+    batch: filters.batch, eligibility: filters.eligibility, skill: filters.skill, minimum,
+  }), [query, search, filters.department, filters.batch, filters.eligibility, filters.skill, minimum]);
+  const request = useMemo(() => ({
+    ...scope, page: String(page), readiness: filters.readiness,
+  }), [scope, page, filters.readiness]);
+  const load = useCallback(async (signal: AbortSignal) => ({
+    ...await getCohortReadiness(request, signal), request, scope,
+  }), [request, scope]);
+  const { data, loading, error, refresh } = useCommunityData(load, !selected);
+
+  function changeFilter(key: keyof CandidateFilters, value: string) {
+    setFilters(current => ({ ...current, [key]: value, ...(key === 'skill' ? { minimum: '' } : {}) }));
+    if (key !== 'search') setPage(1);
+  }
+
+  function changeQuery(next: ReadinessQuery) {
+    if (next.policy !== query.policy) setFilters(current => ({ ...current, skill: '', minimum: '' }));
+    setQuery(next);
+    setPage(1);
+  }
+
+  if (selected) return <StudentDrilldown studentId={selected} query={query} onBack={() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('student')) {
+      url.searchParams.delete('student');
+      window.history.replaceState(window.history.state, '', url);
+    }
+    setSelected('');
+  }} />;
+
+  const waitingForSearch = search !== filters.search.trim();
+  const currentData = data?.request === request && !waitingForSearch ? data : undefined;
+  const updating = loading || waitingForSearch || (!currentData && !error);
+  const recording = tab === 'Record evaluation';
+  return <>
+    <SectionIntro eyebrow="Readiness" title="Readiness" description="Compare student readiness, review evidence, and record placement decisions."
+      action={<Button className="!w-fit" variant="outline" disabled={loading} onClick={refresh}>Refresh</Button>} />
+    <div className="flex flex-wrap gap-1.5 sm:gap-2" role="group" aria-label="Readiness workspace">
+      {tabs.map(label => <Button key={label} size="sm" className="px-2 sm:px-3" aria-pressed={tab === label} variant={tab === label ? 'default' : 'outline'} onClick={() => setTab(label)}>{label}</Button>)}
     </div>
-    <div className="flex flex-wrap gap-2">{['Overview', 'Record evaluation', 'Scoring policies'].map(label => <Button key={label} variant={tab === label ? 'default' : 'outline'} onClick={() => { setTab(label); setSelected(''); }}>{label}</Button>)}</div>
-    {loading && <p role="status" className="text-sm text-primary">Updating analytics…</p>}
-    {tab === 'Scoring policies' ? <PolicyEditor key={data.policy._id} initial={data.policy} onSaved={policy => { setQuery(current => ({ ...current, policy: policy._id })); }} /> : tab === 'Record evaluation' ? <EvidenceForm key={data.policy._id} policy={data.policy} students={data.students.map(row => row.student)} onSaved={refresh} /> : selected ? <StudentDrilldown studentId={selected} query={query} onBack={() => { setSelected(''); refresh(); }} /> : <>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{['Placement Ready', 'Almost Ready', 'Needs Improvement', 'Not Ready', 'Insufficient Evidence'].map(status => <Card key={status}><CardContent className="p-4"><p className="text-sm text-muted-foreground">{status}</p><p className="mt-2 text-3xl font-semibold">{data.students.filter(student => student.status === status).length}</p></CardContent></Card>)}</div>
-      <Card><CardHeader><CardTitle>Shortlist candidates</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Input aria-label="Search students" placeholder="Name or registration number" value={search} onChange={event => setSearch(event.target.value)} />
-        <select aria-label="Readiness status" className={selectClass} value={readiness} onChange={event => setReadiness(event.target.value)}><option value="">All readiness levels</option>{['Placement Ready', 'Almost Ready', 'Needs Improvement', 'Not Ready', 'Insufficient Evidence'].map(value => <option key={value}>{value}</option>)}</select>
-        <select aria-label="Department" className={selectClass} value={department} onChange={event => setDepartment(event.target.value)}><option value="">All departments</option>{[...new Set(data.students.map(row => row.student.department).filter(Boolean))].map(value => <option key={value}>{value}</option>)}</select>
-        <select aria-label="Batch" className={selectClass} value={batch} onChange={event => setBatch(event.target.value)}><option value="">All batches</option>{[...new Set(data.students.map(row => row.student.batch).filter(Boolean))].map(value => <option key={value}>{value}</option>)}</select>
-        <select aria-label="Company eligibility" className={selectClass} value={eligible} onChange={event => setEligible(event.target.value)}><option value="">All eligibility outcomes</option>{['Eligible', 'Nearly Eligible', 'Not Eligible'].map(value => <option key={value}>{value}</option>)}</select>
-        <select aria-label="Filter skill" className={selectClass} value={skill} onChange={event => setSkill(event.target.value)}><option value="">Any skill</option>{data.policy.skills.map(skill => <option key={skill.key} value={skill.key}>{skill.label}</option>)}</select><Input aria-label="Minimum skill score" placeholder="Minimum skill score / 10" type="number" min="0" max="10" step="0.1" disabled={!skill} value={minimum} onChange={event => setMinimum(event.target.value)} /></div>
-        <p className="text-sm text-muted-foreground">{rows.length} of {data.students.length} students on this page · {data.total} matching students in total. Readiness and skill filters apply to this page.</p>
-        {rows.map(row => <button key={row.student.id} className="w-full rounded-lg border p-4 text-left hover:border-primary focus-visible:ring-2" onClick={() => setSelected(row.student.id)}><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{row.student.name}</p><p className="text-xs text-muted-foreground">{row.student.registrationNumber} · {row.student.department || 'Department not set'} · {row.student.batch} · {row.student.section?.name || 'Unassigned'}</p></div><div className="flex flex-wrap items-center gap-2"><span className="text-xl font-semibold">{scoreText(row.overall)}/10</span><Badge variant="outline">{row.status}</Badge><Badge variant="outline">{row.eligibility.status}</Badge></div></div><p className="mt-2 text-sm text-muted-foreground">{row.eligibility.reasons.slice(0, 2).join(' · ') || 'Meets the selected policy requirements'}</p>{row.decision && <p className="mt-2 text-sm">Coordinator: {row.decision.decision} — {row.decision.reason}</p>}</button>)}
-        {!rows.length && <p className="py-8 text-center text-muted-foreground">No students match these filters.</p>}
-      </CardContent></Card>
-    </>}
+    <FilterBar policies={data?.policies ?? []} query={query} onChange={changeQuery} />
+    {tab === 'Overview' && <ReadinessOverview counts={data?.scope === scope && !waitingForSearch ? data.counts : undefined} readiness={filters.readiness} onSelect={value => changeFilter('readiness', value)} />}
+    {tab !== 'Scoring policies' && <CandidateFilterPanel filters={filters} data={data} recording={recording} onChange={changeFilter} onReset={() => {
+      setFilters(emptyCandidateFilters);
+      setSearch('');
+      setPage(1);
+    }} />}
+    {error && <LoadError message={error} onRetry={refresh} />}
+    {tab === 'Scoring policies' ? (
+      data && data.request.policy === query.policy ? <PolicyEditor key={data.policy._id} initial={data.policy} onSaved={policy => changeQuery({ ...query, policy: policy._id })} /> :
+        !error && <SkeletonRows rows={2} />
+    ) : <section aria-label={recording ? 'Evaluation roster' : 'Candidate results'} aria-busy={updating} className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-semibold">{recording ? 'Record evaluation' : 'Shortlist candidates'}</h2>
+          <p className="text-sm text-muted-foreground" role="status">{updating ? 'Updating students…' : currentData ? `${currentData.total} matching ${currentData.total === 1 ? 'student' : 'students'} · Page ${currentData.page} of ${Math.max(1, currentData.pages)}` : ''}</p>
+        </div>
+        {currentData && <div className="flex gap-2" role="group" aria-label="Candidate pages">
+          <Button variant="outline" size="sm" disabled={updating || currentData.page <= 1} onClick={() => setPage(currentData.page - 1)}>Previous</Button>
+          <Button variant="outline" size="sm" disabled={updating || currentData.page >= currentData.pages} onClick={() => setPage(currentData.page + 1)}>Next</Button>
+        </div>}
+      </div>
+      {currentData ? recording && currentData.students.length ? (
+        <EvidenceForm key={currentData.policy._id} policy={currentData.policy} students={currentData.students.map(row => row.student)} onSaved={refresh} />
+      ) : <CandidateResults rows={currentData.students} policy={currentData.policy} onSelect={setSelected} />
+        : !error && <SkeletonRows rows={4} />}
+    </section>}
+    {tab === 'Overview' && <CohortLeaderboard />}
   </>;
 }
+
 function StudentDrilldown({ studentId, query, onBack }: { studentId: string; query: ReadinessQuery; onBack: () => void }) {
-  const load = useCallback(() => getReadiness(query, studentId), [query, studentId]);
+  const load = useCallback((signal: AbortSignal) => getReadiness(query, studentId, signal), [query, studentId]);
   const { data, loading, error, refresh } = useCommunityData(load);
-  if (!data && loading) return <PageSkeleton label="Loading student evidence" />;
-  if (error || !data) return <LoadError message={error || 'Unable to load student'} onRetry={refresh} />;
-  return <div className="space-y-4"><Button variant="outline" onClick={onBack}>Back to candidates</Button><h1 className="text-2xl font-semibold">{data.student.name}</h1><ReadinessView report={data} /><DecisionForms report={data} query={query} onSaved={refresh} />
+  const back = <Button variant="outline" onClick={onBack}>Back to candidates</Button>;
+  if (!data && loading) return <div className="space-y-4">{back}<PageSkeleton label="Loading student evidence" /></div>;
+  if (!data) return <div className="space-y-4">{back}<LoadError message={error || 'Unable to load student'} onRetry={refresh} /></div>;
+  return <div className="space-y-4">{back}{error && <LoadError message={error} onRetry={refresh} />}<h1 className="text-2xl font-semibold">{data.student.name}</h1><ReadinessView report={data} /><DecisionForms report={data} query={query} onSaved={refresh} />
     <Card><CardHeader><CardTitle>Decision history</CardTitle></CardHeader><CardContent className="space-y-3">{data.decisions.length ? data.decisions.map(decision => <div key={decision._id} className="rounded-md border p-3"><p className="font-semibold">{decision.decision}</p><p>{decision.reason}</p><p className="text-xs text-muted-foreground">{decision.recordedBy?.name || 'Coordinator'} · {new Date(decision.createdAt).toLocaleString()}</p></div>) : <p className="text-sm text-muted-foreground">No coordinator decision recorded for this policy version.</p>}</CardContent></Card>
   </div>;
 }

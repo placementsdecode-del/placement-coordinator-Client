@@ -10,3 +10,25 @@ export type CohortRow = Pick<ReadinessReport, 'student' | 'overall' | 'status' |
 export type ReadinessQuery = { policy?: string; months?: string; from?: string; to?: string; page?: string; search?: string };
 export type Attempt = { resultsPending?: boolean; assessmentId?: string; marks?: (number | null)[]; passingMarks?: number | null; correctAnswers?: number | null; timeSpentSeconds?: number;  id: string; ledgerId: string; attemptNumber: number; title: string; skill: string; difficulty: string; status: string; startedAt: string; dueAt: string; submittedAt?: string; gradedAt?: string; totalMarks: number; score: number | null; feedback?: string; rubric?: string; answers: (string | string[] | null)[]; questions: { id: string; type: string; text: string; options: string[]; marks: number; correctAnswer?: string | string[] }[]; student?: { _id: string; name: string; registrationNumber: string }; automaticMarks?: (number | null)[] };
 export type AssessmentCatalog = { assessments: { _id: string; title: string; category: string; difficulty: string; instructions: string; status: string; durationMinutes: number; attemptsAllowed: number; totalMarks: number; attempts: { id: string; status: string; score: number | null; totalMarks: number; startedAt: string }[] }[]; attempts: Attempt[] };
+
+export type CandidateFilters = {
+  search: string;
+  readiness: string;
+  department: string;
+  batch: string;
+  eligibility: string;
+  skill: string;
+  minimum: string;
+};
+
+export type ReadinessDirectoryPage = {
+  policy: ReadinessPolicy;
+  policies: ReadinessPolicy[];
+  students: CohortRow[];
+  counts: Partial<Record<string, number>>;
+  departments: string[];
+  batches: string[];
+  page: number;
+  pages: number;
+  total: number;
+};

@@ -1,12 +1,21 @@
 import { Breadcrumbs } from '@/components/common/breadcrumbs';
-import type { ReactNode } from "react";
-import { Bell, LogOut, Menu, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Bell, LogOut, Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { ActionToast } from "@/components/common/action-toast";
 import { BrandLogo } from "@/components/common/brand-logo";
 import { Button } from "@/components/ui/button";
 import { adminNavItems } from "@/data/admin";
 import { cn } from "@/lib/utils";
 import type { AdminNavLabel } from "@/types/admin";
+
+import { useNavigationDrawer } from "./use-navigation-drawer";
+
+const navigationGroups = [
+  { heading: "Overview", items: ["Dashboard", "Readiness"] },
+  { heading: "Student management", items: ["Students", "Cohorts", "Groups"] },
+  { heading: "Learning", items: ["Tasks", "Assessments"] },
+  { heading: "Administration", items: ["Coordinators", "Settings"] },
+];
 
 export function AdminShell({
   role = "admin",
@@ -31,6 +40,8 @@ export function AdminShell({
   onLogout: () => void;
   onDismissToast: () => void;
 }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const drawer = useNavigationDrawer(mobileMenuOpen);
   return (
     <main className="workspace-shell min-h-screen overflow-x-hidden">
       {mobileMenuOpen ? (
@@ -38,47 +49,51 @@ export function AdminShell({
       ) : null}
 
       <aside
+        id="workspace-sidebar"
+        onKeyDown={event => { if (event.key === "Escape" && mobileMenuOpen) onCloseMenu(); }}
         className={cn(
-          "workspace-sidebar fixed inset-y-0 left-0 z-40 w-72 max-w-[86vw] border-r bg-white transition-transform lg:translate-x-0",
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
+          "workspace-sidebar fixed inset-y-0 left-0 z-40 w-64 max-w-[86vw] border-r bg-white transition-[width,transform] lg:translate-x-0",
+          collapsed && "lg:w-20",
+          mobileMenuOpen ? "visible translate-x-0" : "invisible -translate-x-full lg:visible",
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b px-5">
-          <BrandLogo subtitle={role === "teacher" ? "Coordinator" : "Admin"} />
-          <Button className="lg:hidden" variant="ghost" size="icon" onClick={onCloseMenu} aria-label="Close navigation">
+        <div className={cn("flex h-16 items-center justify-between border-b px-5", collapsed && "lg:justify-center lg:px-2")}>
+          <BrandLogo compact={collapsed && !mobileMenuOpen} subtitle={role === "teacher" ? "Coordinator" : "Admin"} />
+          <Button ref={drawer.closeButton} className="lg:hidden" variant="ghost" size="icon" onClick={onCloseMenu} aria-label="Close navigation">
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <div className="border-b px-5 py-3">
-          <p className="text-sm font-bold">Organization Workspace</p>
-          <p className="text-xs text-muted-foreground">{role === "teacher" ? "Faculty workspace" : "Organization Admin"}</p>
-        </div>
-        <nav className="h-[calc(100vh-7.25rem)] space-y-1 overflow-y-auto p-3">
-          {adminNavItems.filter(item => role !== "teacher" || !["Coordinators", "Settings"].includes(item.label)).map((item) => (
-            <button
-              key={item.label}
-              aria-current={activeNav === item.label ? "page" : undefined}
-              className={cn(
-                "flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-medium transition-colors",
-                activeNav === item.label ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
-              )}
-              onClick={() => {
-                onChangeNav(item.label);
-                onCloseMenu();
-              }}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              <span className="truncate">{item.label}</span>
-            </button>
+        <nav aria-label="Workspace navigation" className="h-[calc(100dvh-4rem)] space-y-4 overflow-y-auto p-3">
+          {navigationGroups.filter(group => role !== "teacher" || group.heading !== "Administration").map(group => (
+            <div key={group.heading} role="group" aria-label={group.heading} className="space-y-1">
+              <p className={cn("px-3 text-xs font-semibold text-slate-300", collapsed && "lg:sr-only")}>{group.heading}</p>
+              {group.items.map(label => adminNavItems.find(item => item.label === label)).map(item => item && (
+                <button
+                  key={item.label}
+                  aria-label={item.label}
+                  title={collapsed ? item.label : undefined}
+                  aria-current={activeNav === item.label ? "page" : undefined}
+                  className={cn("flex w-full items-center gap-3 rounded-md px-3 text-left text-sm font-medium transition-colors",
+                    collapsed && "lg:justify-center lg:px-0")}
+                  onClick={() => { onChangeNav(item.label); onCloseMenu(); }}
+                >
+                  <item.icon aria-hidden="true" className="size-4 shrink-0" />
+                  <span className={cn("truncate", collapsed && "lg:hidden")}>{item.label}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
       </aside>
 
-      <div className="lg:pl-72">
-        <header className="fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between border-b bg-white px-4 md:px-6 lg:left-72">
+      <div className={cn("transition-[padding-left]", collapsed ? "lg:pl-20" : "lg:pl-64")}>
+        <header className={cn("fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between border-b bg-white px-4 transition-[left] md:px-6", collapsed ? "lg:left-20" : "lg:left-64")}>
           <div className="flex min-w-0 items-center gap-3">
-            <Button className="lg:hidden" variant="outline" size="icon" onClick={onOpenMenu} aria-label="Open navigation">
+            <Button ref={drawer.trigger} className="lg:hidden" variant="outline" size="icon" onClick={onOpenMenu} aria-label="Open navigation" aria-controls="workspace-sidebar" aria-expanded={mobileMenuOpen}>
               <Menu className="h-5 w-5" />
+            </Button>
+            <Button className="hidden lg:inline-flex" size="icon" variant="ghost" onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-controls="workspace-sidebar" aria-expanded={!collapsed}>
+              {collapsed ? <PanelLeftOpen className="size-5" /> : <PanelLeftClose className="size-5" />}
             </Button>
             <div className="min-w-0">
               <h2 className="truncate text-lg font-semibold">{activeNav}</h2>
@@ -94,7 +109,7 @@ export function AdminShell({
             </Button>
           </div>
         </header>
-        <div className="mx-auto max-w-[1600px] space-y-5 p-3 pb-28 pt-20 sm:space-y-6 sm:p-4 sm:pb-28 sm:pt-20 md:p-6 md:pt-20 lg:pb-6">
+        <div className={cn("workspace-content", ["Readiness", "Students", "Assessments"].includes(activeNav) && "workspace-content-wide")}>
           {!["Assessments", "Cohorts", "My Cohorts", "Groups", "My Groups"].includes(activeNav) && <Breadcrumbs items={[{ label: "Dashboard", onClick: activeNav !== "Dashboard" ? () => onChangeNav("Dashboard") : undefined }, ...(activeNav !== "Dashboard" ? [{ label: activeNav }] : [])]} />}{children}
         </div>
       </div>

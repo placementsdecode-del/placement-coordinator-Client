@@ -13,13 +13,14 @@ export function AssessmentAttempts({ selectedId, onSelect }: { selectedId: strin
   const [active, setActive] = useState<Attempt | null>(null); const [pending, setPending] = useState(false); const [actionError, setActionError] = useState('');
   if (active) return <AttemptRunner key={active.id} attempt={active} onClose={() => { setActive(null); refresh(); }} />;
   if (!data && loading) return <PageSkeleton label="Loading assessments" />;
-  if (error) return <LoadError message={error} onRetry={refresh} />;
-  return <><SectionIntro eyebrow="Demonstrate your skills" title="Assessments" description="Complete assigned assessments. Objective questions are graded automatically; written and coding responses are reviewed against a rubric." action={<Button variant="outline" disabled={loading} onClick={refresh}>Refresh</Button>} />
+  if (error && !data) return <LoadError message={error} onRetry={refresh} />;
+  return <><SectionIntro eyebrow="Assessments" title="Assessments" description="Complete assigned assessments. Objective questions are graded automatically; written and coding responses are reviewed against a rubric." action={<Button variant="outline" disabled={loading} onClick={refresh}>Refresh</Button>} />
+    {error && <LoadError message={error} onRetry={refresh} />}
     {actionError && <p role="alert" className="text-destructive">{actionError}</p>}
     {!selectedId && !data?.assessments.length && <Card><CardContent className="p-6">No assessments assigned yet.</CardContent></Card>}
     <Breadcrumbs items={[{ label: 'Assessments', onClick: selectedId ? () => onSelect('') : undefined }, ...(selectedId ? [{ label: data?.assessments.find(a => a._id === selectedId)?.title || 'Assessment' }] : [])]} />
     {selectedId && !data?.assessments.some(assessment => assessment._id === selectedId) && <Card><CardContent className="p-6 text-sm text-muted-foreground">This assessment is no longer available. Use the Assessments link to see your current assignments.</CardContent></Card>}
-    {!selectedId ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{data?.assessments.map(a => <button key={a._id} onClick={() => onSelect(a._id)} className="rounded-xl border bg-white p-5 text-left hover:border-primary"><h2 className="font-semibold">{a.title}</h2><p className="mt-2 text-sm text-muted-foreground">{a.category} · {a.durationMinutes} min</p><p className="mt-3 text-sm">{a.status} · {a.attempts.length} attempts</p></button>)}</div> : data?.assessments.filter(a => a._id === selectedId).map(assessment => <Card key={assessment._id}><CardHeader><CardTitle>{assessment.title}</CardTitle></CardHeader><CardContent className="space-y-3"><p>{assessment.instructions}</p><p className="text-sm text-muted-foreground">{assessment.category} · {assessment.difficulty} · {assessment.durationMinutes} minutes · {assessment.totalMarks} marks · {assessment.attempts.length}/{assessment.attemptsAllowed} attempts · {assessment.status}</p>
+    {!selectedId ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{data?.assessments.map(a => <button key={a._id} onClick={() => onSelect(a._id)} className="rounded-xl border bg-white p-5 text-left hover:border-primary"><h2 className="font-semibold">{a.title}</h2><p className="mt-2 text-sm text-muted-foreground">{a.category} · {a.durationMinutes} min</p><p className="mt-3 text-sm">{a.status} · {a.attempts.length} attempts</p></button>)}</div> : data?.assessments.filter(a => a._id === selectedId).map(assessment => <Card key={assessment._id}><CardHeader><CardTitle>{assessment.title}</CardTitle></CardHeader><CardContent className="space-y-3"><p className="max-w-prose whitespace-pre-wrap break-words leading-relaxed">{assessment.instructions}</p><p className="text-sm text-muted-foreground">{assessment.category} · {assessment.difficulty} · {assessment.durationMinutes} minutes · {assessment.totalMarks} marks · {assessment.attempts.length}/{assessment.attemptsAllowed} attempts · {assessment.status}</p>
       <Button disabled={pending || assessment.status !== 'active' || assessment.attempts.length >= assessment.attemptsAllowed && !assessment.attempts.some(attempt => attempt.status === 'in-progress')} onClick={async () => { setPending(true); setActionError(''); try { const result = await startAssessmentAttempt(assessment._id); setActive(result.attempt); } catch (error) { setActionError(error instanceof Error ? error.message : 'Unable to start assessment'); } finally { setPending(false); } }}>{pending ? 'Opening…' : assessment.attempts.some(attempt => attempt.status === 'in-progress') ? 'Resume attempt' : 'Start assessment'}</Button>
       {data.attempts.filter(attempt => assessment.attempts.some(row => row.id === attempt.id)).map(attempt => <div key={attempt.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"><span>Attempt {attempt.attemptNumber} · {attempt.status} · {attempt.score === null ? 'Not graded' : `${attempt.score}/${attempt.totalMarks}`}</span><Button variant="outline" onClick={() => setActive(attempt)}>View attempt</Button></div>)}
     </CardContent></Card>)}</>;
@@ -27,30 +28,92 @@ export function AssessmentAttempts({ selectedId, onSelect }: { selectedId: strin
 function AttemptRunner({ attempt, onClose }: { attempt: Attempt; onClose: () => void }) {
   const [current, setCurrent] = useState(attempt); const [answers, setAnswers] = useState<Attempt['answers']>(() => attempt.questions.map((_, index) => attempt.answers[index] ?? ''));
   const [now, setNow] = useState(Date.now()); const [pending, setPending] = useState(false); const [sync, setSync] = useState(''); const [error, setError] = useState('');
-  const latest = useRef(answers); const dirty = useRef(false); const saving = useRef(false);
+  const latest = useRef(answers);
+  const dirty = useRef(false);
+  const saving = useRef<Promise<unknown> | null>(null);
+  const action = useRef(false);
   const autoSubmitted = useRef(false);
-  const expired = now > +new Date(current.dueAt); const editable = current.status === 'in-progress' && !expired;
-  useEffect(() => {
-    if (!expired || current.status !== 'in-progress' || autoSubmitted.current) return;
-    autoSubmitted.current = true;
+  const finalized = useRef(false);
+  const expired = now > +new Date(current.dueAt);
+  const editable = current.status === 'in-progress' && !expired;
+
+  const submit = useCallback(async (afterDeadline = false) => {
+    if (action.current || finalized.current) return;
+    action.current = true;
     setPending(true);
-    submitAssessmentAttempt(current, latest.current)
-      .then(result => { setCurrent(result.attempt); setAnswers(result.attempt.answers); latest.current = result.attempt.answers; dirty.current = false; setSync('Submitted'); })
-      .catch(reason => setError(reason instanceof Error ? reason.message : 'Unable to finalize assessment. Use Submit assessment to retry.'))
-      .finally(() => setPending(false));
-  }, [expired, current]);
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
+    setError('');
+    try {
+      if (afterDeadline) await saving.current?.catch(() => {});
+      const result = await submitAssessmentAttempt(current, latest.current);
+      finalized.current = true;
+      setCurrent(result.attempt);
+      setAnswers(result.attempt.answers);
+      latest.current = result.attempt.answers;
+      dirty.current = false;
+      setSync('Submitted');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to submit assessment. Please retry.');
+    } finally {
+      action.current = false;
+      setPending(false);
+    }
+  }, [current]);
+
+  useEffect(() => {
+    if (!expired || current.status !== 'in-progress' || autoSubmitted.current || pending) return;
+    autoSubmitted.current = true;
+    void submit(true);
+  }, [expired, current.status, pending, submit]);
+  useEffect(() => {
+    if (current.status !== 'in-progress') return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [current.status]);
   useEffect(() => {
     if (current.status !== 'in-progress') return;
     const timer = setInterval(async () => {
-      if (!dirty.current || saving.current || Date.now() > +new Date(current.dueAt)) return;
-      saving.current = true; const snapshot = latest.current;
-      try { await saveAssessmentAnswers(current, snapshot); if (snapshot === latest.current) dirty.current = false; setSync('Answers saved'); setError(''); }
-      catch (error) { setError(error instanceof Error ? error.message : 'Autosave failed. Keep this page open and retry.'); }
-      finally { saving.current = false; }
+      if (!dirty.current || saving.current || action.current || Date.now() > +new Date(current.dueAt)) return;
+      const snapshot = latest.current;
+      const request = saveAssessmentAnswers(current, snapshot);
+      saving.current = request;
+      try {
+        await request;
+        if (!finalized.current && snapshot === latest.current) {
+          dirty.current = false;
+          if (!action.current) {
+            setSync('Answers saved');
+            setError('');
+          }
+        }
+      } catch (reason) {
+        if (!action.current && !finalized.current) setError(reason instanceof Error ? reason.message : 'Autosave failed. Keep this page open and retry.');
+      } finally {
+        saving.current = null;
+      }
     }, 3000);
     return () => clearInterval(timer);
   }, [current]);
+  async function leave() {
+    if (action.current) return;
+    if (!dirty.current || !editable) {
+      onClose();
+      return;
+    }
+    action.current = true;
+    setPending(true);
+    setError('');
+    try {
+      await saving.current?.catch(() => {});
+      if (dirty.current) await saveAssessmentAnswers(current, latest.current);
+      dirty.current = false;
+      onClose();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to save answers');
+    } finally {
+      action.current = false;
+      setPending(false);
+    }
+  }
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => { if (dirty.current) event.preventDefault(); };
     window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);
@@ -63,7 +126,10 @@ function AttemptRunner({ attempt, onClose }: { attempt: Attempt; onClose: () => 
     {error && <p role="alert" className="text-destructive">{error}</p>}
     <fieldset disabled={!editable || pending} className="space-y-4">{current.questions.map((question, index) => <Card key={question.id}><CardHeader><CardTitle>Q{index + 1}. {question.text}</CardTitle></CardHeader><CardContent className="space-y-2"><p className="text-xs text-muted-foreground">{question.marks} marks · {question.type}</p>{['single-choice', 'multiple-choice', 'true-false'].includes(question.type) ? (question.type === 'true-false' ? ['true', 'false'] : question.options).map((option, optionIndex) => <label key={optionIndex} className="flex items-center gap-3 rounded-md border p-3"><input type={question.type === 'multiple-choice' ? 'checkbox' : 'radio'} name={`question-${index}`} checked={question.type === 'multiple-choice' ? Array.isArray(answers[index]) && (answers[index] as string[]).includes(option) : answers[index] === option} onChange={event => { if (question.type === 'multiple-choice') { const selected = Array.isArray(answers[index]) ? answers[index] as string[] : []; update(index, event.target.checked ? [...selected, option] : selected.filter(value => value !== option)); } else update(index, option); }} />{option}</label>) : <textarea aria-label={`Answer ${index + 1}`} className="min-h-32 w-full rounded-md border p-3" maxLength={10000} value={typeof answers[index] === 'string' ? answers[index] as string : ''} onChange={event => update(index, event.target.value)} />}</CardContent></Card>)}</fieldset>
     {current.feedback && <Card><CardContent className="space-y-2 p-5"><p className="font-semibold">Instructor feedback</p><p>{current.feedback}</p><p className="text-sm text-muted-foreground">Rubric: {current.rubric}</p></CardContent></Card>}
-    <div className="flex flex-wrap gap-2">{current.status === 'in-progress' && <Button disabled={pending} onClick={async () => { setPending(true); setError(''); try { const result = await submitAssessmentAttempt(current, latest.current); setCurrent(result.attempt); setAnswers(result.attempt.answers); latest.current = result.attempt.answers; dirty.current = false; setSync('Submitted'); } catch (error) { setError(error instanceof Error ? error.message : 'Unable to submit'); } finally { setPending(false); } }}>{pending ? 'Submitting…' : 'Submit assessment'}</Button>}<Button variant="outline" disabled={pending} onClick={async () => { if (dirty.current && editable) { setPending(true); try { await saveAssessmentAnswers(current, latest.current); dirty.current = false; onClose(); } catch (error) { setError(error instanceof Error ? error.message : 'Unable to save'); } finally { setPending(false); } } else onClose(); }}>Back to assessments</Button></div>
+    <div className="flex flex-wrap gap-2">
+      {current.status === 'in-progress' && <Button disabled={pending} onClick={() => void submit(expired)}>{pending ? 'Submitting…' : 'Submit assessment'}</Button>}
+      <Button variant="outline" disabled={pending} onClick={() => void leave()}>Back to assessments</Button>
+    </div>
   </>;
 }
 export function AssessmentReviewQueue({ assessmentId, title, onBack }: { assessmentId: string; title?: string; onBack?: () => void }) {

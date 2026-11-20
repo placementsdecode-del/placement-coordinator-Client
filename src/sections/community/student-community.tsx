@@ -68,9 +68,10 @@ export function MyGroups({ onChanged }: { onChanged: () => void }) {
 export function MyAssignedWork({ kind }: { kind?: string }) {
   const { data, error, loading, refresh } = useCommunityData(getMyWork);
   if (!data && loading) return <PageSkeleton label="Loading assigned work" />;
-  if (error) return <LoadError message={error} onRetry={refresh} />;
+  if (error && !data) return <LoadError message={error} onRetry={refresh} />;
   const selected = new URLSearchParams(window.location.search).get('item');
   const work = (data?.work.filter(item => kind ? item.kind === kind : item.kind !== 'assessment') || []).sort((a, b) => Number(b._id === selected) - Number(a._id === selected));
   return <><SectionIntro eyebrow="From your coordinators" title="Tasks & Activities" description="Tasks, activities, homework, and announcements from your coordinators." action={<Button variant="outline" disabled={loading} onClick={refresh}>Refresh</Button>} />
+    {error && <LoadError message={error} onRetry={refresh} />}
     {work.length ? work.map(item => <Card key={item._id} className={selected === item._id ? 'border-primary ring-2 ring-primary/20' : ''}><CardHeader><div className="flex flex-wrap gap-2"><Badge variant="outline">{item.kind}</Badge><Badge variant="outline">{item.status}</Badge></div><CardTitle>{item.title}</CardTitle></CardHeader><CardContent><ExpandableText text={item.instructions} label="instructions" />{!["announcement", "assessment"].includes(item.kind) && <WorkResponse key={`${item._id}:${item.submission?.status || "new"}`} work={item} onSaved={refresh} />}{item.kind === 'assessment' && <p className="mt-3 text-sm text-muted-foreground">{item.durationMinutes} minutes · {item.totalMarks} marks</p>}{item.kind === "assessment" && <Button asChild variant="outline" className="mt-3"><a href="/student/assessments">Open assessments</a></Button>}</CardContent></Card>) : <EmptyState icon={Users} title="No assigned work yet" description="Published items will appear here when a coordinator assigns them to your section." />}</>;
 }

@@ -12,6 +12,8 @@ import { mobileNavItems, navItems } from "@/data/student";
 import { cn } from "@/lib/utils";
 import type { NavLabel } from "@/types/student";
 
+import { useNavigationDrawer } from "./use-navigation-drawer";
+
 export function StudentShell({
   activeNav,
   mobileMenuOpen,
@@ -39,6 +41,7 @@ export function StudentShell({
 }) {
   const trackingError = useLearningTracker(activeNav);
   const { data: community } = useCommunityData(getMySectionSummary);
+  const drawer = useNavigationDrawer(mobileMenuOpen);
   return (
     <main className="workspace-shell min-h-screen overflow-x-hidden">
       {mobileMenuOpen ? (
@@ -50,29 +53,29 @@ export function StudentShell({
       ) : null}
 
       <aside
+        id="workspace-sidebar"
+        onKeyDown={event => { if (event.key === "Escape" && mobileMenuOpen) onCloseMenu(); }}
         className={cn(
           "workspace-sidebar fixed inset-y-0 left-0 z-40 max-w-[86vw] border-r bg-white transition-[width,transform] lg:translate-x-0",
-          sidebarCollapsed ? "lg:w-20" : "w-72 lg:w-72",
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
+          sidebarCollapsed ? "w-72 lg:w-20" : "w-72",
+          mobileMenuOpen ? "visible translate-x-0" : "invisible -translate-x-full lg:visible",
         )}
       >
-        <div className={cn("flex h-16 items-center justify-between border-b px-5", sidebarCollapsed && "lg:px-2")}>
+        <div className={cn("flex h-16 items-center justify-between border-b px-5", sidebarCollapsed && "lg:justify-center lg:px-2")}>
           <BrandLogo compact={sidebarCollapsed && !mobileMenuOpen} />
-          <Button className="hidden lg:inline-flex" variant="ghost" size="icon" onClick={onToggleSidebar} aria-label="Minimize navigation">
-            {sidebarCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
-          </Button>
-          <Button className="lg:hidden" variant="ghost" size="icon" onClick={onCloseMenu} aria-label="Close navigation">
+          <Button ref={drawer.closeButton} className="lg:hidden" variant="ghost" size="icon" onClick={onCloseMenu} aria-label="Close navigation">
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <nav className="h-[calc(100vh-4rem)] space-y-1 overflow-y-auto p-3">
+        <nav aria-label="Workspace navigation" className="h-[calc(100dvh-4rem)] space-y-1 overflow-y-auto p-3">
           {navItems.map((item) => (
             <button
               key={item.label}
               aria-current={activeNav === item.label ? "page" : undefined}
+              aria-label={item.label}
               title={sidebarCollapsed ? item.label : undefined}
               className={cn(
-                "group relative flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-medium transition-colors",
+                "flex h-10 w-full items-center gap-3 rounded-md px-3 text-left text-sm font-medium transition-colors",
                 sidebarCollapsed && "lg:justify-center lg:px-0",
                 activeNav === item.label ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
               )}
@@ -83,14 +86,6 @@ export function StudentShell({
             >
               <item.icon className="h-4 w-4 shrink-0" />
               <span className={cn("truncate", sidebarCollapsed && "lg:hidden")}>{item.label}</span>
-              <span
-                className={cn(
-                  "pointer-events-none absolute left-[calc(100%+0.75rem)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-md border bg-white px-3 py-2 text-sm font-medium text-foreground opacity-0 shadow-lg transition-opacity",
-                  sidebarCollapsed && "lg:block lg:group-hover:opacity-100 lg:group-focus-visible:opacity-100",
-                )}
-              >
-                {item.label}
-              </span>
             </button>
           ))}
         </nav>
@@ -104,8 +99,11 @@ export function StudentShell({
           )}
         >
           <div className="flex min-w-0 items-center gap-3">
-            <Button className="lg:hidden" variant="outline" size="icon" onClick={onOpenMenu} aria-label="Open navigation">
+            <Button ref={drawer.trigger} className="lg:hidden" variant="outline" size="icon" onClick={onOpenMenu} aria-label="Open navigation" aria-controls="workspace-sidebar" aria-expanded={mobileMenuOpen}>
               <Menu className="h-5 w-5" />
+            </Button>
+            <Button className="hidden lg:inline-flex" variant="ghost" size="icon" onClick={onToggleSidebar} aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"} aria-controls="workspace-sidebar" aria-expanded={!sidebarCollapsed}>
+              {sidebarCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
             </Button>
             <div className="min-w-0">
               <h2 className="truncate text-lg font-semibold">{activeNav}</h2>
@@ -120,10 +118,10 @@ export function StudentShell({
           </div>
         </header>
 
-        <div className="mx-auto max-w-[1600px] space-y-5 p-3 pb-28 pt-20 sm:space-y-6 sm:p-4 sm:pb-28 sm:pt-20 md:p-6 md:pt-20 lg:pb-6">{trackingError && <p role="status" className="text-sm text-amber-700">Learning-time sync failed. Check your connection.</p>}{!["Assessments", "Cohorts", "My Cohorts", "Groups", "My Groups"].includes(activeNav) && <Breadcrumbs items={[{ label: "Dashboard", onClick: activeNav !== "Dashboard" ? () => onChangeNav("Dashboard") : undefined }, ...(activeNav !== "Dashboard" ? [{ label: activeNav }] : [])]} />}{children}</div>
+        <div className={cn("workspace-content", ["Assessments", "Coding Practice"].includes(activeNav) && "workspace-content-wide")}>{trackingError && <p role="status" className="text-sm text-amber-700">Learning-time sync failed. Check your connection.</p>}{!["Assessments", "Cohorts", "My Cohorts", "Groups", "My Groups"].includes(activeNav) && <Breadcrumbs items={[{ label: "Dashboard", onClick: activeNav !== "Dashboard" ? () => onChangeNav("Dashboard") : undefined }, ...(activeNav !== "Dashboard" ? [{ label: activeNav }] : [])]} />}{children}</div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-white px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-10px_30px_rgba(31,41,55,0.08)] lg:hidden">
+      <nav aria-label="Quick navigation" className="fixed inset-x-0 bottom-0 z-30 border-t bg-white px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-10px_30px_rgba(31,41,55,0.08)] lg:hidden">
         <div className="grid grid-cols-5 gap-1">
           {mobileNavItems.map((item) => (
             <button

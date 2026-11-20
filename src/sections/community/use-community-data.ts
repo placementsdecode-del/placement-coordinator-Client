@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 // Keep stale content during explicit refreshes; guard updates after unmount.
-export function useCommunityData<T>(load: () => Promise<T>) {
+export function useCommunityData<T>(load: (signal: AbortSignal) => Promise<T>, enabled = true) {
   const [data, setData] = useState<T>();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -8,10 +8,13 @@ export function useCommunityData<T>(load: () => Promise<T>) {
   const refresh = useCallback(() => setVersion(value => value + 1), []);
   useEffect(() => { window.addEventListener("community-changed", refresh); return () => window.removeEventListener("community-changed", refresh); }, [refresh]);
   useEffect(() => {
+    if (!enabled) return;
+    const request = new AbortController();
     let active = true;
     setLoading(true);
-    load().then(value => { if (active) { setData(value); setError(''); } }).catch(error => { if (active) setError(error instanceof Error ? error.message : 'Unable to load this page.'); }).finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [load, version]);
+    setError('');
+    load(request.signal).then(value => { if (active) { setData(value); setError(''); } }).catch(error => { if (active) setError(error instanceof Error ? error.message : 'Unable to load this page.'); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; request.abort(); };
+  }, [load, version, enabled]);
   return { data, error, loading, refresh };
 }

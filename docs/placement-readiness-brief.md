@@ -29,3 +29,21 @@ Prepare consent-based, permission-scoped HR access to longitudinal profiles and 
 ## Delivery order
 
 Audit existing data and missing evidence first. Then implement reliable activity/attempt capture, scoring rules and tests, student/coordinator dashboards, and company-specific shortlisting. Integrate external HR access later. Use the shared API client and domain services; include loading/error/empty states and test calculations, permissions, retries, and historical reproducibility. Do not fabricate analytics when source data is missing.
+
+## Readiness directory and learning overview
+
+The coordinator directory combines search, department, batch, eligibility, skill and minimum score, and readiness across the full roster permitted for the viewer. The overview counts apply every candidate filter except readiness so each card shows the result count for its own readiness category. Results are sorted by name and student ID, with 50 students per page. Department and batch choices cover the permitted roster. A skill filter requires a calculated score, and a minimum score of zero includes zero-mark evaluations.
+
+The student overview prioritizes in-progress assessments, links to scheduled assessments and assignments awaiting a response, and shows recent activity and policy-based next steps. The assessment model has a scheduled status. Displaying start dates would require storing and exposing a schedule date. Resuming study guides and career roadmaps across devices would require server-side progress records.
+
+The directory calculates role- and date-specific readiness on request in batches. Large, evidence-heavy rosters and concurrent use should be measured against production data before deciding whether to store precomputed readiness summaries.
+
+### Files changed
+
+| Area | Files |
+| --- | --- |
+| Workspace and common UI | `client/src/App.tsx`, `client/src/index.css`, `client/src/components/layout/admin-shell.tsx`, `student-shell.tsx`, `super-admin-shell.tsx`, `use-navigation-drawer.ts`, `client/src/components/common/cohort-leaderboard.tsx` |
+| Readiness and assessments | `client/src/sections/readiness/coordinator-readiness.tsx`, `candidate-filters.tsx`, `candidate-results.tsx`, `readiness-view.tsx`, `student-readiness.tsx`, `assessment-attempts.tsx` |
+| Student learning | `client/src/sections/dashboard/student-overview.tsx`, `client/src/sections/community/student-community.tsx`, `use-community-data.ts`, `client/src/sections/coding-practice/coding-practice-section.tsx` |
+| API and reporting | `client/src/services/readiness.api.service.ts`, `community.api.service.ts`, `client/src/types/readiness.ts`, `server/src/controllers/readiness.controller.ts`, `attempt.controller.ts`, `leaderboard.controller.ts`, `server/src/services/readiness/report.ts` |
+| Tests and documentation | `client/tests/readiness-workflows.cjs`, `server/tests/readiness.integration.ts`, `server/tests/platform.integration.ts`, this brief |

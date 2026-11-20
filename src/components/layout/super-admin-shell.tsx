@@ -7,6 +7,8 @@ import { superAdminNavItems } from "@/data/super-admin";
 import { cn } from "@/lib/utils";
 import type { SuperAdminNavLabel } from "@/types/super-admin";
 
+import { useNavigationDrawer } from "./use-navigation-drawer";
+
 export function SuperAdminShell({
   activeNav,
   mobileMenuOpen,
@@ -28,6 +30,7 @@ export function SuperAdminShell({
   onLogout: () => void;
   onDismissToast: () => void;
 }) {
+  const drawer = useNavigationDrawer(mobileMenuOpen);
   return (
     <main className="workspace-shell min-h-screen overflow-x-hidden">
       {mobileMenuOpen ? (
@@ -35,14 +38,16 @@ export function SuperAdminShell({
       ) : null}
 
       <aside
+        id="workspace-sidebar"
+        onKeyDown={event => { if (event.key === "Escape" && mobileMenuOpen) onCloseMenu(); }}
         className={cn(
           "workspace-sidebar fixed inset-y-0 left-0 z-40 w-72 max-w-[86vw] border-r bg-white transition-transform lg:translate-x-0",
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
+          mobileMenuOpen ? "visible translate-x-0" : "invisible -translate-x-full lg:visible",
         )}
       >
         <div className="flex h-16 items-center justify-between border-b px-5">
           <BrandLogo subtitle="Platform" />
-          <Button className="lg:hidden" variant="ghost" size="icon" onClick={onCloseMenu} aria-label="Close navigation">
+          <Button ref={drawer.closeButton} className="lg:hidden" variant="ghost" size="icon" onClick={onCloseMenu} aria-label="Close navigation">
             <X className="h-5 w-5" />
           </Button>
         </div>
@@ -74,7 +79,7 @@ export function SuperAdminShell({
       <div className="lg:pl-72">
         <header className="fixed left-0 right-0 top-0 z-30 flex h-16 items-center justify-between border-b bg-white px-4 md:px-6 lg:left-72">
           <div className="flex min-w-0 items-center gap-3">
-            <Button className="lg:hidden" variant="outline" size="icon" onClick={onOpenMenu} aria-label="Open navigation">
+            <Button ref={drawer.trigger} className="lg:hidden" variant="outline" size="icon" onClick={onOpenMenu} aria-label="Open navigation" aria-controls="workspace-sidebar" aria-expanded={mobileMenuOpen}>
               <Menu className="h-5 w-5" />
             </Button>
             <div className="min-w-0">
@@ -91,7 +96,7 @@ export function SuperAdminShell({
             </Button>
           </div>
         </header>
-        <div className="mx-auto max-w-[1600px] space-y-5 p-3 pb-28 pt-20 sm:space-y-6 sm:p-4 sm:pb-28 sm:pt-20 md:p-6 md:pt-20 lg:pb-6">
+        <div className="workspace-content">
           {children}
         </div>
       </div>

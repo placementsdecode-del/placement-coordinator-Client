@@ -119,6 +119,18 @@
     background: radial-gradient(ellipse at 90% 0%, #e8edff 0%, transparent 36%), #f5f7fb;
   }
 
+  .compact-select {
+    @apply block h-11 w-full min-w-0 rounded-md border border-input bg-white px-3 text-base text-foreground disabled:bg-muted disabled:text-muted-foreground sm:h-10 sm:text-sm;
+  }
+
+  .workspace-content {
+    @apply mx-auto min-w-0 max-w-[90rem] space-y-5 px-3 pb-28 pt-20 sm:space-y-6 sm:px-4 md:px-6 lg:pb-6;
+  }
+
+  .workspace-content-wide {
+    @apply max-w-[100rem];
+  }
+
   .workspace-sidebar {
     background: linear-gradient(170deg, #172846, #101c33 75%);
     color: #f1f5f9;

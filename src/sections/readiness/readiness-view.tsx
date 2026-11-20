@@ -3,11 +3,11 @@ import type { ReadinessPolicy, ReadinessQuery, ReadinessReport } from '@/types/r
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { scoreText } from '@/lib/utils';
-export const selectClass = 'h-11 w-full rounded-md border bg-white px-3 text-sm';
+export const selectClass = 'compact-select';
 export function FilterBar({ policies, query, onChange, children }: { policies: ReadinessPolicy[]; query: ReadinessQuery; onChange: (query: ReadinessQuery) => void; children?: ReactNode }) {
-  return <div className="grid gap-3 rounded-lg border bg-white p-4 sm:grid-cols-2 xl:grid-cols-4"><label className="text-sm font-medium">Target role / company<select aria-label="Target role or company" className={selectClass} value={query.policy || ''} onChange={event => onChange({ ...query, policy: event.target.value })}><option value="">Default role</option>{policies.map(policy => <option key={policy._id} value={policy._id}>{policy.label} · v{policy.version}</option>)}</select></label>
-    <label className="text-sm font-medium">Evidence window<select aria-label="Evidence window" className={selectClass} value={query.months || 'custom'} onChange={event => onChange({ policy: query.policy, ...(event.target.value === 'custom' ? { from: new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) } : { months: event.target.value }) })}><option value="3">3 months</option><option value="4">4 months</option><option value="6">6 months</option><option value="custom">Custom dates</option></select></label>
-    {!query.months && <><label className="text-sm font-medium">From (UTC)<input aria-label="From date" type="date" className={selectClass} value={query.from || ''} onChange={event => onChange({ ...query, from: event.target.value })} /></label><label className="text-sm font-medium">To (UTC)<input aria-label="To date" type="date" className={selectClass} value={query.to || ''} onChange={event => onChange({ ...query, to: event.target.value })} /></label></>}{children}</div>;
+  return <div className="flex flex-wrap gap-3 rounded-lg border bg-white p-4 [&>label]:w-full sm:[&>label]:w-auto sm:[&>label]:max-w-xs sm:[&>label]:min-w-36"><label className="space-y-1 text-sm font-medium">Target role / company<select aria-label="Target role or company" className={selectClass} value={query.policy || ''} onChange={event => onChange({ ...query, policy: event.target.value })}><option value="">Default role</option>{policies.map(policy => <option key={policy._id} value={policy._id}>{policy.label} · v{policy.version}</option>)}</select></label>
+    <label className="space-y-1 text-sm font-medium">Evidence window<select aria-label="Evidence window" className={selectClass} value={query.months || 'custom'} onChange={event => onChange({ policy: query.policy, ...(event.target.value === 'custom' ? { from: new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) } : { months: event.target.value }) })}><option value="3">3 months</option><option value="4">4 months</option><option value="6">6 months</option><option value="custom">Custom dates</option></select></label>
+    {!query.months && <><label className="space-y-1 text-sm font-medium">From (UTC)<input aria-label="From date" type="date" className={selectClass} value={query.from || ''} onChange={event => onChange({ ...query, from: event.target.value })} /></label><label className="space-y-1 text-sm font-medium">To (UTC)<input aria-label="To date" type="date" className={selectClass} value={query.to || ''} onChange={event => onChange({ ...query, to: event.target.value })} /></label></>}{children}</div>;
 }
 export function ReadinessView({ report }: { report: ReadinessReport }) {
   const [evidenceLimit, setEvidenceLimit] = useState(10);
@@ -15,7 +15,7 @@ export function ReadinessView({ report }: { report: ReadinessReport }) {
   const daily = report.daily.slice(-14);
   const maximumMinutes = Math.max(1, ...daily.map(day => day.minutes));
   const metrics = [
-    { label: 'Readiness', value: report.overall === null ? 'Awaiting results' : `${scoreText(report.overall)} / 10`, detail: report.overall === null ? 'Complete graded assessments to build your score.' : report.status },
+    { label: 'Readiness', value: report.overall === null ? 'Not evaluated' : `${scoreText(report.overall)} / 10`, detail: report.status },
     { label: 'Active learning', value: `${activity.activeMinutes} min`, detail: `${activity.activeDays} active days` },
     { label: 'Problems solved', value: `${activity.problemsSolved} / ${activity.problemsAttempted}`, detail: `${activity.submissions} submissions` },
     { label: 'Assessments', value: String(activity.assessmentsCompleted), detail: `${activity.pendingReview} awaiting review` },
