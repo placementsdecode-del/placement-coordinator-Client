@@ -33,7 +33,7 @@ export function approveOrganizationRegistration(
   registrationId: string,
   payload: { features: string[]; adminName: string; discussionNotes: string },
 ) {
-  return apiFetch(API_ENDPOINTS.organizationRegistrations.approve(registrationId), {
+  return apiFetch<{ message: string; temporaryPassword?: string; admin: { email: string } }>(API_ENDPOINTS.organizationRegistrations.approve(registrationId), {
     method: "POST",
     body: JSON.stringify(payload),
   });

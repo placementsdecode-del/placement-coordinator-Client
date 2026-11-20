@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { ReadinessPolicy, ReadinessQuery, ReadinessReport } from '@/types/readiness';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-export const scoreText = (value: number | null | undefined) => value == null ? '—' : value.toFixed(1);
+import { scoreText } from '@/lib/utils';
 export const selectClass = 'h-11 w-full rounded-md border bg-white px-3 text-sm';
 export function FilterBar({ policies, query, onChange, children }: { policies: ReadinessPolicy[]; query: ReadinessQuery; onChange: (query: ReadinessQuery) => void; children?: ReactNode }) {
   return <div className="grid gap-3 rounded-lg border bg-white p-4 sm:grid-cols-2 xl:grid-cols-4"><label className="text-sm font-medium">Target role / company<select aria-label="Target role or company" className={selectClass} value={query.policy || ''} onChange={event => onChange({ ...query, policy: event.target.value })}><option value="">Default role</option>{policies.map(policy => <option key={policy._id} value={policy._id}>{policy.label} · v{policy.version}</option>)}</select></label>

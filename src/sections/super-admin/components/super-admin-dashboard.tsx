@@ -1,11 +1,10 @@
-import { BarChart3, CreditCard, LifeBuoy, Plus, ShieldCheck } from "lucide-react";
+import { BarChart3, CreditCard, LifeBuoy, ShieldCheck } from "lucide-react";
 import { ApiNotice } from "@/components/common/admin-primitives";
 import { DonutProgress } from "@/components/common/donut-progress";
 import { EmptyState } from "@/components/common/empty-state";
 import { SkeletonRows } from "@/components/common/loading-state";
 import { SectionIntro } from "@/components/common/section-intro";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { auditLogs, supportTickets } from "@/data/super-admin";
 import type { OrganizationRequest, OrganizationRow } from "@/types/super-admin";
@@ -15,7 +14,6 @@ export function SuperAdminDashboard({
   requests,
   loading,
   loadError,
-  onAction,
 }: {
   organizations: OrganizationRow[];
   requests: OrganizationRequest[];
@@ -36,12 +34,7 @@ export function SuperAdminDashboard({
         eyebrow="Super Admin"
         title="Platform operations across every organization."
         description="Approve institutions, manage subscriptions, monitor platform usage, review support, and audit activity."
-        action={
-          <Button onClick={() => onAction("Global platform action opened.")}>
-            <Plus className="h-4 w-4" />
-            Global Action
-          </Button>
-        }
+
       />
       {loadError ? <ApiNotice message={loadError} /> : null}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -73,7 +66,7 @@ export function SuperAdminDashboard({
                     {org.plan} · {org.students} students · {org.region}
                   </p>
                 </div>
-                <DonutProgress value={org.usage} size="sm" className="justify-self-start sm:justify-self-end" />
+                <DonutProgress value={org.usage} caption="Active accounts" size="sm" className="justify-self-start sm:justify-self-end" />
               </div>
             )) : (
               <EmptyState title="No organizations yet" description="Approved organizations will appear here after registration review." />

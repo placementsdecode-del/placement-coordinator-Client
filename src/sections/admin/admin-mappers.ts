@@ -35,6 +35,8 @@ export function mapStudentUser(user: ApiUser, sections: ApiSection[] = []): Admi
     rollNo: user.registrationNumber || (user.id || user._id || "").slice(-6),
     email: user.email,
     phone: user.phoneNumber || "",
+    skills: user.skills || [],
+    resumeUrl: user.resumeUrl || '',
     section: sectionName,
     cohortIds: user.cohorts || [],
     sectionId: typeof user.section === "object" && user.section ? user.section._id : user.section || "",

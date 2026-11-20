@@ -11,6 +11,8 @@ import { EmptyState } from '@/components/common/empty-state';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { submitWorkResponse } from '@/services/work.api.service';
+import type { AssignedWork } from '@/types/community';
 
 export function MySection() {
   const [opened, setOpened] = useState('');
@@ -25,6 +27,26 @@ export function MySection() {
     {peer ? <Card><CardHeader><CardTitle>{peer.name}</CardTitle><CardDescription>{peer.registrationNumber || 'Student'} · {section?.name}</CardDescription></CardHeader></Card> : section ? <><Card><CardHeader><CardTitle>Coordinators</CardTitle><CardDescription>{section.description}</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-3">{section.assignedTeachers.map(t => <div key={t._id} className="rounded-lg border p-4">{t.name}</div>)}{!section.assignedTeachers.length && <p>No coordinators assigned yet.</p>}</CardContent></Card><h2 className="font-semibold">Participants ({section.classmates.length})</h2><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{section.classmates.map(p => <button key={p._id} onClick={() => setPeerId(p._id)} className="rounded-lg border bg-white p-4 text-left hover:border-primary"><p className="font-semibold">{p.name}</p><p className="text-sm text-muted-foreground">{p.registrationNumber}</p></button>)}</div></> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{data?.sections.map(s => <button key={s._id} onClick={() => setOpened(s._id)} className="rounded-xl border bg-white p-5 text-left hover:border-primary"><h2 className="font-semibold">{s.name}</h2><p className="mt-2 text-sm text-muted-foreground">{s.description}</p><p className="mt-3 text-sm">{s.classmates.length} participants · {s.assignedTeachers.length} coordinators</p></button>)}</div>}
     {!data?.sections.length && <EmptyState icon={Users} title="No cohorts yet" description="Your coordinator can add you to a learning cohort." />}</>;
 
+}
+
+function WorkResponse({ work, onSaved }: { work: AssignedWork; onSaved: () => void }) {
+  const [response, setResponse] = useState(work.submission?.response || '');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const reviewed = work.submission?.status === 'reviewed';
+  return <div className="mt-4 border-t pt-4">
+    {work.submission && <p role="status" className="mb-2 text-sm font-medium">{reviewed ? 'Reviewed' : 'Response submitted'}</p>}
+    {reviewed ? <><p className="whitespace-pre-wrap text-sm">{work.submission?.response}</p><p className="mt-3 whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">{work.submission?.feedback}</p></> : <form className="space-y-3" onSubmit={async event => {
+      event.preventDefault(); setPending(true); setError('');
+      try { await submitWorkResponse(work._id, response); onSaved(); }
+      catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to submit response'); }
+      finally { setPending(false); }
+    }}>
+      <label className="block text-sm font-medium">Your response<textarea required maxLength={10000} disabled={pending} value={response} onChange={event => setResponse(event.target.value)} className="mt-2 min-h-28 w-full rounded-lg border p-3" /></label>
+      <Button type="submit" disabled={pending || !response.trim()}>{pending ? 'Submitting…' : work.submission ? 'Update response' : 'Submit response'}</Button>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    </form>}
+  </div>;
 }
 const loadGroups = async () => { const [groups, invitations] = await Promise.all([listGroups(), listGroupInvitations()]); return { ...groups, ...invitations }; };
 export function MyGroups({ onChanged }: { onChanged: () => void }) {
@@ -49,5 +71,5 @@ export function MyAssignedWork({ kind }: { kind?: string }) {
   const selected = new URLSearchParams(window.location.search).get('item');
   const work = (data?.work.filter(item => kind ? item.kind === kind : item.kind !== 'assessment') || []).sort((a, b) => Number(b._id === selected) - Number(a._id === selected));
   return <><SectionIntro eyebrow="From your coordinators" title="Tasks & Activities" description="Tasks, activities, homework, and announcements from your coordinators." action={<Button variant="outline" disabled={loading} onClick={refresh}>Refresh</Button>} />
-    {work.length ? work.map(item => <Card key={item._id} className={selected === item._id ? 'border-primary ring-2 ring-primary/20' : ''}><CardHeader><div className="flex flex-wrap gap-2"><Badge variant="outline">{item.kind}</Badge><Badge variant="outline">{item.status}</Badge></div><CardTitle>{item.title}</CardTitle></CardHeader><CardContent><p className="whitespace-pre-wrap">{item.instructions}</p>{item.kind === 'assessment' && <p className="mt-3 text-sm text-muted-foreground">{item.durationMinutes} minutes · {item.totalMarks} marks</p>}{item.kind === "assessment" && <Button asChild variant="outline" className="mt-3"><a href="/student/assessments">Open assessments</a></Button>}</CardContent></Card>) : <EmptyState icon={Users} title="No assigned work yet" description="Published items will appear here when a coordinator assigns them to your section." />}</>;
+    {work.length ? work.map(item => <Card key={item._id} className={selected === item._id ? 'border-primary ring-2 ring-primary/20' : ''}><CardHeader><div className="flex flex-wrap gap-2"><Badge variant="outline">{item.kind}</Badge><Badge variant="outline">{item.status}</Badge></div><CardTitle>{item.title}</CardTitle></CardHeader><CardContent><p className="whitespace-pre-wrap">{item.instructions}</p>{!["announcement", "assessment"].includes(item.kind) && <WorkResponse key={`${item._id}:${item.submission?.status || "new"}`} work={item} onSaved={refresh} />}{item.kind === 'assessment' && <p className="mt-3 text-sm text-muted-foreground">{item.durationMinutes} minutes · {item.totalMarks} marks</p>}{item.kind === "assessment" && <Button asChild variant="outline" className="mt-3"><a href="/student/assessments">Open assessments</a></Button>}</CardContent></Card>) : <EmptyState icon={Users} title="No assigned work yet" description="Published items will appear here when a coordinator assigns them to your section." />}</>;
 }

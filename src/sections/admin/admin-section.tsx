@@ -1,12 +1,14 @@
+import { ChangePasswordCard } from '@/components/common/change-password-card';
+import { useApiResource } from "@/hooks/use-api-resource";
+import { ResourcePanel } from "@/components/common/resource-panel";
 import { listFaculty } from "@/services/groups.api.service";
 import { BulkStudents } from "./components/bulk-students";
 import { GroupsAdmin } from "@/sections/community/groups-admin";
 import { WorkAdmin } from "@/sections/community/work-admin";
 import { useCallback, useEffect, useState } from "react";
 
-import { PageSkeleton, LoadError } from "@/components/common/loading-state";
 
-import { adminAssessments, adminCoordinators, adminTasks, coordinatorRoles } from "@/data/admin";
+import { adminCoordinators, adminTasks, coordinatorRoles } from "@/data/admin";
 import { listPermissions, listRoles, syncOrganizationRoles, updateRole } from "@/services/roles.api.service";
 import { createAssessment as createAssessmentRecord, listAssessments, validateAssessment, updateAssessment } from "@/services/assessments.api.service";
 import { assignStudentToSection, removeStudentFromSection, createSection as createSectionRecord, listSections, updateSection } from "@/services/sections.api.service";
@@ -38,95 +40,33 @@ export function AdminSection({
   currentUser: SessionUser | null;
   onAction: (message: string) => void;
 }) {
-  const [sections, setSections] = useState<SectionRow[]>([]);
+  const organizationId = getOrganizationId(currentUser?.organization);
+  const usersResource = useApiResource(useCallback(() => listUsers(organizationId), [organizationId]), [] as ApiUser[]);
+  const sectionsResource = useApiResource(useCallback(() => listSections(organizationId), [organizationId]), [] as ApiSection[]);
+  const assessmentsResource = useApiResource(useCallback(() => listAssessments(organizationId), [organizationId]), [] as Awaited<ReturnType<typeof listAssessments>>);
+  const facultyResource = useApiResource(listFaculty, { faculty: [] as ApiUser[] });
+  const rolesResource = useApiResource(useCallback(() => currentUser?.role === 'teacher' ? Promise.resolve([]) : listRoles(organizationId), [organizationId, currentUser?.role]), [] as ApiRole[]);
+  const permissionsResource = useApiResource(useCallback(() => currentUser?.role === 'teacher' ? Promise.resolve([]) : listPermissions(), [currentUser?.role]), [] as string[]);
+  const { data: organizationUsers, setData: setOrganizationUsers, refresh: refreshOrganizationUsers } = usersResource;
+  const { data: apiSections, setData: setApiSections, refresh: refreshSections } = sectionsResource;
+  const { refresh: refreshAssessments } = assessmentsResource;
+  const sections = apiSections.map(mapSection);
+  const assessments = assessmentsResource.data.map(mapAssessment);
+  const faculty = facultyResource.data.faculty;
+  const apiRoles = rolesResource.data;
+  const apiPermissions = permissionsResource.data;
   const [students, setStudents] = useState<AdminStudentRow[]>([]);
   const [coordinators, setCoordinators] = useState<CoordinatorRow[]>(adminCoordinators);
-  const [faculty, setFaculty] = useState<ApiUser[]>([]);
-  const [organizationUsers, setOrganizationUsers] = useState<ApiUser[]>([]);
-  const [apiRoles, setApiRoles] = useState<ApiRole[]>([]);
-  const [apiPermissions, setApiPermissions] = useState<string[]>([]);
   const [roles, setRoles] = useState<CoordinatorRole[]>(coordinatorRoles);
   const [tasks] = useState<AdminTask[]>(adminTasks);
-  const [assessments, setAssessments] = useState<AdminAssessment[]>(adminAssessments);
-  const [apiSections, setApiSections] = useState<ApiSection[]>([]);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [usersLoading, setUsersLoading] = useState(true);
-  const [workLoading, setWorkLoading] = useState(true);
-  const [usersError, setUsersError] = useState("");
-  const [workError, setWorkError] = useState("");
-  useEffect(() => { if (!usersLoading && !workLoading) setHasLoaded(true); }, [usersLoading, workLoading]);
-  const loadError = [usersError, workError].filter(Boolean).join(" ");
-  const [selectedSectionId, setSelectedSectionId] = useState(sections[2]?.id ?? sections[0]?.id);
-  const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id ?? "");
-
-  const selectedSection = sections.find((section) => section.id === selectedSectionId) ?? sections[0] ?? null;
-  const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? students[0] ?? null;
-
-  const refreshOrganizationUsers = useCallback(async () => {
-    const organizationId = getOrganizationId(currentUser?.organization);
-    setUsersLoading(true);
-    try {
-      const [users, roleRows, permissionRows, facultyRows] = await Promise.all([
-        listUsers(organizationId),
-        currentUser?.role === "teacher" ? Promise.resolve([]) : listRoles(organizationId),
-        currentUser?.role === "teacher" ? Promise.resolve([]) : listPermissions(),
-        listFaculty(),
-      ]);
-      setOrganizationUsers(users);
-      setFaculty(facultyRows.faculty);
-      setApiRoles(roleRows);
-      setApiPermissions(permissionRows);
-      setUsersError("");
-    } catch {
-      setOrganizationUsers([]);
-      setStudents([]);
-      setApiRoles([]);
-      setApiPermissions([]);
-      setUsersError("Unable to load organization users.");
-    } finally {
-      setUsersLoading(false);
-    }
-  }, [currentUser?.organization, currentUser?.role]);
-
-  useEffect(() => {
-    refreshOrganizationUsers();
-  }, [refreshOrganizationUsers]);
-
+  const [selectedSectionId, setSelectedSectionId] = useState('');
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const selectedSection = sections.find(s => s.id === selectedSectionId) ?? null;
+  const selectedStudent = students.find(s => s.id === selectedStudentId) ?? null;
   useEffect(() => {
     setCoordinators(organizationUsers.filter(u => u.role === 'teacher').map(u => ({ id: u.id, name: u.name, email: u.email, phone: u.phoneNumber || '', role: 'Coordinator', status: u.status === 'active' ? 'Active' : 'Inactive', sections: apiSections.filter(s => s.assignedTeachers.some(t => (t.id || t._id) === u.id)).map(s => s.name) })));
-    setStudents(organizationUsers.filter((user) => user.role === "student").map((user) => mapStudentUser(user, apiSections)));
+    setStudents(organizationUsers.filter(u => u.role === 'student').map(u => mapStudentUser(u, apiSections)));
   }, [organizationUsers, apiSections]);
-
-  const refreshOrganizationWork = useCallback(async () => {
-    const organizationId = getOrganizationId(currentUser?.organization);
-    if (!organizationId) {
-      setWorkLoading(false);
-      return;
-    }
-
-    setWorkLoading(true);
-    try {
-      const [sectionRows, assessmentRows] = await Promise.all([
-        listSections(organizationId),
-        listAssessments(organizationId),
-      ]);
-      setApiSections(sectionRows);
-      setSections(sectionRows.map(mapSection));
-      setAssessments(assessmentRows.map(mapAssessment));
-      setWorkError("");
-    } catch {
-      setApiSections([]);
-      setSections([]);
-      setAssessments([]);
-      setWorkError("Unable to load sections or assessments.");
-    } finally {
-      setWorkLoading(false);
-    }
-  }, [currentUser?.organization]);
-
-  useEffect(() => {
-    refreshOrganizationWork();
-  }, [refreshOrganizationWork]);
 
   async function createSection(section: SectionRow) {
     const organizationId = getOrganizationId(currentUser?.organization);
@@ -140,7 +80,7 @@ export function AdminSection({
       description: section.description,
       status: section.status === "Active" ? "active" : "inactive",
     });
-    await refreshOrganizationWork();
+    await refreshSections();
     setSelectedSectionId(response.section._id);
     onAction(response.message || "Section created.");
   }
@@ -169,7 +109,6 @@ export function AdminSection({
       description: section.description, status: section.status === "Active" ? "active" : "inactive",
     });
     setApiSections((items) => items.map((item) => item._id === section.id ? response.section : item));
-    setSections((items) => items.map((item) => item.id === section.id ? mapSection(response.section) : item));
     onAction("Section updated.");
   }
 
@@ -185,7 +124,7 @@ export function AdminSection({
         assignedTeachers.add(teacher.id);
         return updateSection(sectionId, { assignedTeachers: Array.from(assignedTeachers) });
       }));
-      await refreshOrganizationWork();
+      await refreshSections();
     }
 
     onAction("Coordinator added.");
@@ -201,6 +140,7 @@ export function AdminSection({
     try {
       const response = await createUser({ ...user, organization: getOrganizationId(currentUser?.organization) });
       await refreshOrganizationUsers();
+      void facultyResource.refresh();
       onAction(response.temporaryPassword ? `User created. Temporary password: ${response.temporaryPassword}` : response.message || "User created.");
       return response.user;
     } catch (error) {
@@ -244,7 +184,7 @@ export function AdminSection({
 
     try {
       await syncOrganizationRoles(organizationId);
-      await refreshOrganizationUsers();
+      await rolesResource.refresh();
       onAction("Organization roles are ready.");
     } catch (error) {
       onAction(error instanceof Error ? error.message : "Role sync failed.");
@@ -254,7 +194,7 @@ export function AdminSection({
   async function updateApiRolePermissions(roleId: string, permissions: string[]) {
     try {
       await updateRole(roleId, { permissions });
-      await refreshOrganizationUsers();
+      await rolesResource.refresh();
       onAction("Role permissions updated.");
     } catch (error) {
       onAction(error instanceof Error ? error.message : "Role update failed.");
@@ -303,17 +243,14 @@ export function AdminSection({
         throw new Error(validation.errors.join("; "));
       }
       const response = await createAssessmentRecord(apiPayload);
-      await refreshOrganizationWork();
+      await refreshAssessments();
       onAction(response.message || "Assessment created and validated.");
     }
   }
 
-  if (!hasLoaded && (usersLoading || workLoading)) return <PageSkeleton label={`Loading ${activeNav.toLowerCase()}`} />;
-  if (loadError) return <LoadError message={loadError} onRetry={() => { void refreshOrganizationUsers(); void refreshOrganizationWork(); }} />;
-
   if (activeNav === "Students") {
     return (
-      <><BulkStudents sections={sections} onImported={refreshOrganizationUsers} /><StudentsAdmin
+      <><ResourcePanel resource={sectionsResource} label="Import cohorts"><BulkStudents sections={sections} onImported={refreshOrganizationUsers} /></ResourcePanel><ResourcePanel resource={usersResource} label="Students"><StudentsAdmin
         canManage={currentUser?.role !== "teacher"}
         sections={sections}
         students={students}
@@ -321,17 +258,19 @@ export function AdminSection({
         onSelectStudent={setSelectedStudentId}
         onCreateStudent={createStudent}
         onMoveStudent={moveStudent}
-        loading={usersLoading}
-      /></>
+        loading={false}
+      /></ResourcePanel></>
     );
   }
 
   if (activeNav === "Cohorts") {
     return (
-      <SectionsAdmin
+      <ResourcePanel resource={sectionsResource} label="Cohorts"><SectionsAdmin
+        studentsStatus={usersResource}
+        facultyStatus={facultyResource}
         faculty={faculty}
         assignments={Object.fromEntries(apiSections.map(s => [s._id, s.assignedTeachers.map(t => t.id || t._id || '')]))}
-        onAssignCoordinators={async (id, teachers) => { await updateSection(id, { assignedTeachers: teachers }); await refreshOrganizationWork(); }}
+        onAssignCoordinators={async (id, teachers) => { await updateSection(id, { assignedTeachers: teachers }); await refreshSections(); }}
         onRefresh={refreshOrganizationUsers}
         canManage={currentUser?.role !== "teacher"}
         sections={sections}
@@ -344,14 +283,17 @@ export function AdminSection({
         onSelectStudent={setSelectedStudentId}
         onMoveStudent={moveStudent}
         onCreateStudent={createStudent}
-        loading={workLoading || usersLoading}
-      />
+        loading={false}
+      /></ResourcePanel>
     );
   }
 
   if (activeNav === "Coordinators") {
     return (
-      <CoordinatorsAdmin
+      <><ResourcePanel resource={rolesResource} label="Roles" />
+      <ResourcePanel resource={permissionsResource} label="Permissions" />
+      <ResourcePanel resource={sectionsResource} label="Coordinator cohorts" />
+      <ResourcePanel resource={usersResource} label="Coordinators"><CoordinatorsAdmin
         coordinators={coordinators}
         organizationUsers={organizationUsers}
         apiRoles={apiRoles}
@@ -363,23 +305,23 @@ export function AdminSection({
         onCreateOrganizationUser={createOrganizationUser}
         onSyncRoles={syncRoles}
         onUpdateApiRolePermissions={updateApiRolePermissions}
-        loading={usersLoading}
-      />
+        loading={false}
+      /></ResourcePanel></>
     );
   }
 
   if (activeNav === "Tasks") {
-    return <WorkAdmin sections={sections} />;
+    return <WorkAdmin sections={sections} sectionsStatus={sectionsResource} />;
   }
 
   if (activeNav === "Assessments") {
-    return <AssessmentsAdmin assessments={assessments} sections={sections} onCreateValidatedAssessment={createValidatedAssessment} loading={workLoading} onPublish={async id => { await updateAssessment(id, { status: "active" }); await refreshOrganizationWork(); onAction("Assessment published. Students will receive a notification."); }} />;
+    return <AssessmentsAdmin assessments={assessments} sections={sections} onCreateValidatedAssessment={createValidatedAssessment} loading={assessmentsResource.loading && !assessmentsResource.initialized} assessmentsStatus={assessmentsResource} sectionsStatus={sectionsResource} onPublish={async id => { await updateAssessment(id, { status: "active" }); await refreshAssessments(); onAction("Assessment published. Students will receive a notification."); }} />;
   }
 
-  if (activeNav === "Announcements") return <WorkAdmin key="announcements" sections={sections} initialKind="announcement" />;
+  if (activeNav === "Announcements") return <WorkAdmin key="announcements" sections={sections} sectionsStatus={sectionsResource} initialKind="announcement" />;
   if (activeNav === "Reports") return <ReportsAdmin sections={sections} students={students} />;
-  if (activeNav === "Settings") return <SettingsAdmin onAction={onAction} />;
-  if (activeNav === "Groups") return <GroupsAdmin students={students} faculty={faculty} />;
+  if (activeNav === "Settings") return currentUser?.role === "teacher" ? <ChangePasswordCard mustChangePassword={currentUser.mustChangePassword} /> : <SettingsAdmin />;
+  if (activeNav === "Groups") return <GroupsAdmin students={students} faculty={faculty} studentsStatus={usersResource} facultyStatus={facultyResource} />;
 
-  return <AdminDashboard sections={sections} students={students} coordinators={coordinators} tasks={tasks} assessments={assessments} loading={usersLoading || workLoading} loadError={loadError} onAction={onAction} />;
+  return <AdminDashboard sections={sections} students={students} coordinators={coordinators} tasks={tasks} assessments={assessments} loading={false} loadError="" resources={{ students: usersResource, cohorts: sectionsResource, assessments: assessmentsResource }} onAction={onAction} />;
 }

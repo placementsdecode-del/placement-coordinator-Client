@@ -11,14 +11,14 @@ import { adminNavItems } from "@/data/admin";
 import { superAdminNavItems } from "@/data/super-admin";
 import { navItems } from "@/data/student";
 import type { AdminNavLabel } from "@/types/admin";
-import { clearAccessToken, getAccessToken, setAccessToken } from "@/services/api-client";
+import { ApiError, clearAccessToken, getAccessToken, setAccessToken } from "@/services/api-client";
 import { getCurrentUser, login } from "@/services/auth.api.service";
 import type { SessionUser, UserRole } from "@/types/auth";
 import { toAppRole } from "@/types/auth";
 import type { SuperAdminNavLabel } from "@/types/super-admin";
 import type { NavLabel } from "@/types/student";
 
-import { PageSkeleton } from "@/components/common/loading-state";
+import { LoadError, PageSkeleton } from "@/components/common/loading-state";
 
 const StudentReadiness = lazy(() => import("@/sections/readiness/student-readiness").then(module => ({ default: module.StudentReadiness })));
 const CoordinatorReadiness = lazy(() => import("@/sections/readiness/coordinator-readiness").then(module => ({ default: module.CoordinatorReadiness })));
@@ -72,12 +72,15 @@ function pathForNav(role: UserRole, label: string) {
 function App() {
   const initialRouteRole = roleFromPath();
   const [sessionLoading, setSessionLoading] = useState(Boolean(getAccessToken()));
+  const [sessionError, setSessionError] = useState("");
+  const [sessionRetry, setSessionRetry] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getAccessToken()));
   const [userRole, setUserRole] = useState<UserRole>(initialRouteRole ?? "student");
   const [currentUser, setCurrentUser] = useState<SessionUser | null>(null);
   const [showRegistration, setShowRegistration] = useState(window.location.pathname === "/register-organization");
   const [showLogin, setShowLogin] = useState(Boolean(initialRouteRole));
   const [activeNav, setActiveNav] = useState<NavLabel>(() => navFromPath("/student", navItems.map((item) => item.label), "Dashboard"));
+  const [studentItem, setStudentItem] = useState(() => new URLSearchParams(window.location.search).get("item") || "");
   const [activeAdminNav, setActiveAdminNav] = useState<AdminNavLabel>(() => {
     const basePath = initialRouteRole === "teacher" ? "/teacher" : "/admin";
     return navFromPath(basePath, adminNavItems.map((item) => item.label), "Dashboard");
@@ -93,9 +96,10 @@ function App() {
 
   useEffect(() => {
     if (!getAccessToken()) return;
-
+    let active = true;
     getCurrentUser()
       .then((user) => {
+        if (!active) return;
         const appRole = toAppRole(user.role);
         setCurrentUser({ ...user, appRole });
         setUserRole(appRole);
@@ -105,13 +109,19 @@ function App() {
           window.history.replaceState({}, "", pathForRole(appRole));
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (!(error instanceof ApiError) || error.status !== 401) {
+          setSessionError("We couldn’t restore your session. Check your connection and try again.");
+          return;
+        }
         clearAccessToken();
         setIsLoggedIn(false);
         setCurrentUser(null);
       })
-      .finally(() => setSessionLoading(false));
-  }, []);
+      .finally(() => { if (active) setSessionLoading(false); });
+    return () => { active = false; };
+  }, [sessionRetry]);
 
   async function handleLogin(email: string, password: string) {
     const response = await login(email, password);
@@ -123,14 +133,20 @@ function App() {
     setShowRegistration(false);
     setShowLogin(false);
     setActiveNav("Dashboard");
+    setStudentItem("");
     setActiveAdminNav("Dashboard");
     setActiveSuperAdminNav("Dashboard");
     window.history.pushState({}, "", pathForRole(appRole));
   }
 
-  function changeStudentNav(nav: NavLabel) {
+  function changeStudentNav(nav: NavLabel, itemId = "") {
+    const path = pathForNav("student", nav) + (itemId ? `?${new URLSearchParams({ item: itemId })}` : "");
+    if (path !== window.location.pathname + window.location.search) {
+      window.history.pushState({}, "", path);
+      window.scrollTo(0, 0);
+    }
     setActiveNav(nav);
-    window.history.pushState({}, "", pathForNav("student", nav));
+    setStudentItem(itemId);
   }
 
   function changeAdminNav(nav: AdminNavLabel) {
@@ -146,7 +162,9 @@ function App() {
   useEffect(() => {
     const sync = () => {
       setActiveNav(navFromPath('/student', navItems.map(item => item.label), 'Dashboard'));
+      setStudentItem(new URLSearchParams(window.location.search).get('item') || '');
       setActiveAdminNav(navFromPath(userRole === 'teacher' ? '/teacher' : '/admin', adminNavItems.map(item => item.label), 'Dashboard'));
+      setActiveSuperAdminNav(navFromPath('/super-admin', superAdminNavItems.map(item => item.label), 'Dashboard'));
     };
     window.addEventListener('popstate', sync);
     return () => window.removeEventListener('popstate', sync);
@@ -166,7 +184,7 @@ function App() {
     switch (activeNav) {
       case "My Cohorts": return <MySection />;
       case "My Groups": return <MyGroups onChanged={notifyCommunityChanged} />;
-      case "Assigned Work": return <AssessmentAttempts />;
+      case "Assigned Work": return <AssessmentAttempts selectedId={studentItem} onSelect={id => changeStudentNav("Assessments", id)} />;
       case "Activities":
         return <MyAssignedWork kind="activity" />;
       case "Tasks & Activities":
@@ -174,14 +192,14 @@ function App() {
       case "Placement Homework":
         return <MyAssignedWork kind="homework" />;
       case "Study Materials":
-        return <StudyMaterialsSection onAction={showToast} />;
+        return currentUser && <StudyMaterialsSection key={currentUser.id} studentId={currentUser.id} onAction={showToast} />;
       case "Career Roadmaps":
-        return <CareerRoadmapsSection onAction={showToast} />;
+        return currentUser && <CareerRoadmapsSection key={currentUser.id} studentId={currentUser.id} onAction={showToast} onPractice={() => changeStudentNav('Self-Assessment')} />;
       case "Coding Practice":
-        return <CodingPracticeSection onAction={showToast} />;
+        return currentUser && <CodingPracticeSection key={currentUser.id} studentId={currentUser.id} />;
       case "Self-Assessment":
-        return <SelfAssessmentSection onLaunch={(title) => showToast(`${title} launched.`)} />;
-      case "Assessments": return <AssessmentAttempts />;
+        return <SelfAssessmentSection onLaunch={showToast} />;
+      case "Assessments": return <AssessmentAttempts selectedId={studentItem} onSelect={id => changeStudentNav("Assessments", id)} />;
       case "Progress":
         return <><StudentReadiness /><CohortLeaderboard /></>;
       case "Announcements":
@@ -196,6 +214,11 @@ function App() {
   }
 
   if (sessionLoading) return <div className="mx-auto max-w-7xl p-6"><PageSkeleton label="Restoring your session" /></div>;
+  if (sessionError) return <div className="mx-auto max-w-xl p-6"><LoadError message={sessionError} onRetry={() => {
+    setSessionError("");
+    setSessionLoading(true);
+    setSessionRetry(value => value + 1);
+  }} /></div>;
 
   if (!isLoggedIn) {
     if (showRegistration) {
@@ -273,7 +296,7 @@ function App() {
       onLogout={logout}
       onDismissToast={() => setToastMessage("")}
     >
-      <Suspense key={activeNav} fallback={<PageSkeleton label={`Loading ${activeNav}`} />}>{renderSection()}</Suspense>
+      <Suspense key={`${activeNav}:${studentItem}`} fallback={<PageSkeleton label={`Loading ${activeNav}`} />}>{renderSection()}</Suspense>
     </StudentShell>
   );
 }

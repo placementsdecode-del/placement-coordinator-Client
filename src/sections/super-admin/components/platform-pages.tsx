@@ -1,42 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronDown, ChevronRight, FileText, GitCommitHorizontal, LoaderCircle, Plus, Settings } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, FileText, GitCommitHorizontal, LoaderCircle } from "lucide-react";
 import { ChangePasswordCard } from "@/components/common/change-password-card";
 import { DonutProgress } from "@/components/common/donut-progress";
 import { SectionIntro } from "@/components/common/section-intro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { auditLogs, supportTickets } from "@/data/super-admin";
 import { cn } from "@/lib/utils";
 import type { CommitEntry, OrganizationRow } from "@/types/super-admin";
 
-export function PlansPage({ onAction }: { onAction: (message: string) => void }) {
-  return (
-    <>
-      <SectionIntro
-        eyebrow="Plans"
-        title="Subscription plans and tenant billing controls."
-        description="Manage plan limits, subscriptions, and upgrade/downgrade actions."
-        action={<Button onClick={() => onAction("Plan creation opened.")}><Plus className="h-4 w-4" />New Plan</Button>}
-      />
-      <section className="grid gap-4 md:grid-cols-3">
-        {["Starter", "Growth", "Enterprise"].map((plan, index) => (
-          <Card key={plan}>
-            <CardHeader>
-              <CardTitle>{plan}</CardTitle>
-              <CardDescription>{index === 0 ? "Small colleges" : index === 1 ? "Growing institutions" : "Large organizations"}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-3xl font-bold">{index === 0 ? "₹9k" : index === 1 ? "₹29k" : "Custom"}</p>
-              <Badge variant="outline">{index === 2 ? "Unlimited users" : `${index === 0 ? 500 : 2500} students`}</Badge>
-              <Button variant="outline">Edit Plan</Button>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
-    </>
-  );
+export function PlansPage() {
+  return <><SectionIntro eyebrow="Plans" title="Subscription plans" description="Billing requires configured plans and a payment provider." /><Card><CardContent className="p-5 text-sm text-muted-foreground">Subscription billing is awaiting setup. Organization access is managed through Requests and Organizations.</CardContent></Card></>;
 }
 
 export function AnalyticsPage({ organizations }: { organizations: OrganizationRow[] }) {
@@ -44,14 +19,14 @@ export function AnalyticsPage({ organizations }: { organizations: OrganizationRo
     <>
       <SectionIntro
         eyebrow="Platform Analytics"
-        title="Growth, usage, subscriptions, and tenant activity."
-        description="Compare organizations, plan usage, active users, and placement-preparation engagement."
+        title="Organization accounts"
+        description="Student and coordinator counts from organization accounts."
       />
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Card>
           <CardHeader>
-            <CardTitle>Organization Usage</CardTitle>
-            <CardDescription>Usage by tenant.</CardDescription>
+            <CardTitle>Active accounts by organization</CardTitle>
+            <CardDescription>Percentage of accounts enabled for sign-in.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {organizations.map((org) => (
@@ -67,9 +42,7 @@ export function AnalyticsPage({ organizations }: { organizations: OrganizationRo
             <CardDescription>Tenant plans.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {["Enterprise 36%", "Growth 42%", "Starter 14%", "Trial 8%"].map((item) => (
-              <div key={item} className="rounded-lg border p-3 text-sm font-semibold">{item}</div>
-            ))}
+            <p className="text-sm text-muted-foreground">Billing plans have not been configured.</p>
           </CardContent>
         </Card>
       </section>
@@ -77,7 +50,7 @@ export function AnalyticsPage({ organizations }: { organizations: OrganizationRo
   );
 }
 
-export function SupportPage({ onAction }: { onAction: (message: string) => void }) {
+export function SupportPage() {
   return (
     <>
       <SectionIntro
@@ -87,6 +60,7 @@ export function SupportPage({ onAction }: { onAction: (message: string) => void 
       />
       <Card>
         <CardContent className="space-y-3 p-4 sm:p-5">
+          {!supportTickets.length && <p className="text-sm text-muted-foreground">Support ticket collection is awaiting setup.</p>}
           {supportTickets.map((ticket) => (
             <div key={ticket.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_100px_120px] md:items-center">
               <div>
@@ -94,7 +68,7 @@ export function SupportPage({ onAction }: { onAction: (message: string) => void 
                 <p className="text-sm text-muted-foreground">{ticket.organization}</p>
               </div>
               <Badge variant={ticket.priority === "Critical" ? "danger" : ticket.priority === "High" ? "warning" : "outline"}>{ticket.priority}</Badge>
-              <Button size="sm" variant="outline" onClick={() => onAction(`${ticket.id} opened.`)}>Open</Button>
+              <span className="text-sm">{ticket.priority}</span>
             </div>
           ))}
         </CardContent>
@@ -337,24 +311,6 @@ export function DiffView({ patch, truncated }: { patch: string; truncated: boole
   );
 }
 
-export function PlatformSettingsPage({ onAction }: { onAction: (message: string) => void }) {
-  return (
-    <>
-      <SectionIntro
-        eyebrow="Global Settings"
-        title="Platform defaults, security, and system controls."
-        description="Configure global permissions, security controls, support routing, and platform behavior."
-        action={<Button onClick={() => onAction("Platform settings saved.")}><Settings className="h-4 w-4" />Save Settings</Button>}
-      />
-      <Card>
-        <CardContent className="grid gap-3 p-4 sm:p-5 md:grid-cols-2">
-          <Input placeholder="Support email" defaultValue="support@placeprep.io" />
-          <Input placeholder="Default plan" defaultValue="Default Growth Plan" />
-          <Input placeholder="Security policy" defaultValue="MFA optional" />
-          <Input placeholder="Audit retention" defaultValue="Audit retention 365 days" />
-        </CardContent>
-      </Card>
-      <ChangePasswordCard />
-    </>
-  );
+export function PlatformSettingsPage() {
+  return <ChangePasswordCard />;
 }

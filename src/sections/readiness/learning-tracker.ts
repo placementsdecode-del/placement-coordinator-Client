@@ -6,6 +6,7 @@ export function useLearningTracker(page: string) {
   const [syncError, setSyncError] = useState(false);
   useEffect(() => {
     let lastInteraction = performance.now(); let seconds = 0; let sending = false; let active = true;
+    let pending: { seconds: number; context: string; bucket: number } | null = null;
     const interact = () => { if (!document.hidden) lastInteraction = performance.now(); };
     const visibility = () => { lastInteraction = document.hidden ? -Infinity : performance.now(); };
     const events = ['pointerdown', 'keydown', 'scroll', 'pointermove'];
@@ -15,9 +16,15 @@ export function useLearningTracker(page: string) {
       if (learningPages.has(pageRef.current) && !document.hidden && document.hasFocus() && performance.now() - lastInteraction < 60000) seconds = Math.min(30, seconds + 1);
     }, 1000);
     const flush = window.setInterval(async () => {
-      if (sending || !seconds) return;
-      sending = true; const count = seconds; seconds = 0;
-      try { await recordLearningPulse(count, pageRef.current); if (active) setSyncError(false); }
+      if (sending || (!seconds && !pending)) return;
+      if (pending && pending.bucket < Math.floor(Date.now() / 30000) - 4) pending = null;
+      if (!pending) {
+        pending = { seconds, context: pageRef.current, bucket: Math.floor(Date.now() / 30000) };
+        seconds = 0;
+      }
+      if (!pending.seconds) return;
+      sending = true;
+      try { await recordLearningPulse(pending.seconds, pending.context, pending.bucket); pending = null; if (active) setSyncError(false); }
       catch { if (active) setSyncError(true); }
       finally { sending = false; }
     }, 30000);

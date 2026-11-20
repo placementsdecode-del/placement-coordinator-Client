@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { scoreText } from '@/lib/utils';
+import { useCallback, useEffect, useState } from 'react';
 import { getCohortReadiness, getReadiness, listReadinessPolicies, recordAcademics, recordShortlistDecision } from '@/services/readiness.api.service';
 import { useCommunityData } from '@/sections/community/use-community-data';
 import { PageSkeleton, LoadError } from '@/components/common/loading-state';
@@ -8,19 +9,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import type { ReadinessQuery, ReadinessReport } from '@/types/readiness';
-import { FilterBar, ReadinessView, scoreText, selectClass } from './readiness-view';
+import { FilterBar, ReadinessView, selectClass } from './readiness-view';
 import { EvidenceForm } from './evidence-form';
 import { PolicyEditor } from './policy-editor';
 export function CoordinatorReadiness() {
   const [query, setQuery] = useState<ReadinessQuery>({ months: '3' }); const [tab, setTab] = useState('Overview'); const [selected, setSelected] = useState('');
   const [search, setSearch] = useState(''); const [readiness, setReadiness] = useState(''); const [department, setDepartment] = useState(''); const [batch, setBatch] = useState(''); const [skill, setSkill] = useState(''); const [minimum, setMinimum] = useState(''); const [eligible, setEligible] = useState('');
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(current => current.search === search ? current : { ...current, search, page: '1' }), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
   const load = useCallback(async () => { const [cohort, policies] = await Promise.all([getCohortReadiness(query), listReadinessPolicies()]); return { ...cohort, policies: policies.policies }; }, [query]);
   const { data, loading, error, refresh } = useCommunityData(load);
   if (!data && loading) return <PageSkeleton label="Loading student readiness" />;
   if (error || !data) return <LoadError message={error || 'Unable to load readiness'} onRetry={refresh} />;
   const rows = data.students.filter(row => `${row.student.name} ${row.student.registrationNumber}`.toLowerCase().includes(search.toLowerCase()) && (!readiness || row.status === readiness) && (!department || row.student.department === department) && (!batch || row.student.batch === batch) && (!eligible || row.eligibility.status === eligible) && (!skill || minimum === '' || row.skills.some(item => item.key === skill && item.score !== null && item.score >= Number(minimum))));
   return <><SectionIntro eyebrow="Placement intelligence" title="Student readiness & shortlisting" description="Use demonstrated skills, recent evidence, and role-specific requirements to make accountable placement decisions." action={<Button variant="outline" disabled={loading} onClick={refresh}>Refresh</Button>} />
-    <FilterBar policies={data.policies} query={query} onChange={setQuery} />
+    <FilterBar policies={data.policies} query={query} onChange={next => setQuery({ ...next, search, page: '1' })} />
+    <div className="flex flex-wrap items-center gap-3 text-sm">
+      <Button variant="outline" size="sm" disabled={loading || data.page <= 1} onClick={() => setQuery(current => ({ ...current, page: String(data.page - 1) }))}>Previous students</Button>
+      <span>Page {data.page} of {Math.max(1, data.pages)} · {data.total} students</span>
+      <Button variant="outline" size="sm" disabled={loading || data.page >= data.pages} onClick={() => setQuery(current => ({ ...current, page: String(data.page + 1) }))}>Next students</Button>
+    </div>
     <div className="flex flex-wrap gap-2">{['Overview', 'Record evaluation', 'Scoring policies'].map(label => <Button key={label} variant={tab === label ? 'default' : 'outline'} onClick={() => { setTab(label); setSelected(''); }}>{label}</Button>)}</div>
     {loading && <p role="status" className="text-sm text-primary">Updating analytics…</p>}
     {tab === 'Scoring policies' ? <PolicyEditor key={data.policy._id} initial={data.policy} onSaved={policy => { setQuery(current => ({ ...current, policy: policy._id })); }} /> : tab === 'Record evaluation' ? <EvidenceForm key={data.policy._id} policy={data.policy} students={data.students.map(row => row.student)} onSaved={refresh} /> : selected ? <StudentDrilldown studentId={selected} query={query} onBack={() => { setSelected(''); refresh(); }} /> : <>
@@ -31,7 +41,7 @@ export function CoordinatorReadiness() {
         <select aria-label="Batch" className={selectClass} value={batch} onChange={event => setBatch(event.target.value)}><option value="">All batches</option>{[...new Set(data.students.map(row => row.student.batch).filter(Boolean))].map(value => <option key={value}>{value}</option>)}</select>
         <select aria-label="Company eligibility" className={selectClass} value={eligible} onChange={event => setEligible(event.target.value)}><option value="">All eligibility outcomes</option>{['Eligible', 'Nearly Eligible', 'Not Eligible'].map(value => <option key={value}>{value}</option>)}</select>
         <select aria-label="Filter skill" className={selectClass} value={skill} onChange={event => setSkill(event.target.value)}><option value="">Any skill</option>{data.policy.skills.map(skill => <option key={skill.key} value={skill.key}>{skill.label}</option>)}</select><Input aria-label="Minimum skill score" placeholder="Minimum skill score / 10" type="number" min="0" max="10" step="0.1" disabled={!skill} value={minimum} onChange={event => setMinimum(event.target.value)} /></div>
-        <p className="text-sm text-muted-foreground">{rows.length} of {data.students.length} students · company academic requirements are defined in the selected policy</p>
+        <p className="text-sm text-muted-foreground">{rows.length} of {data.students.length} students on this page · {data.total} matching students in total. Readiness and skill filters apply to this page.</p>
         {rows.map(row => <button key={row.student.id} className="w-full rounded-lg border p-4 text-left hover:border-primary focus-visible:ring-2" onClick={() => setSelected(row.student.id)}><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{row.student.name}</p><p className="text-xs text-muted-foreground">{row.student.registrationNumber} · {row.student.department || 'Department not set'} · {row.student.batch} · {row.student.section?.name || 'Unassigned'}</p></div><div className="flex flex-wrap items-center gap-2"><span className="text-xl font-semibold">{scoreText(row.overall)}/10</span><Badge variant="outline">{row.status}</Badge><Badge variant="outline">{row.eligibility.status}</Badge></div></div><p className="mt-2 text-sm text-muted-foreground">{row.eligibility.reasons.slice(0, 2).join(' · ') || 'Meets the selected policy requirements'}</p>{row.decision && <p className="mt-2 text-sm">Coordinator: {row.decision.decision} — {row.decision.reason}</p>}</button>)}
         {!rows.length && <p className="py-8 text-center text-muted-foreground">No students match these filters.</p>}
       </CardContent></Card>

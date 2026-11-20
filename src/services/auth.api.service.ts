@@ -14,6 +14,8 @@ export async function getCurrentUser() {
   return "user" in response ? response.user : response;
 }
 
+export const updateProfile = (payload: { phoneNumber: string; skills: string[]; resumeUrl: string }) => apiFetch<{ user: ApiUser; message: string }>('/api/auth/profile', { method: 'PATCH', body: JSON.stringify(payload) });
+
 export function changePassword(currentPassword: string, newPassword: string) {
   return apiFetch<{ message: string }>(API_ENDPOINTS.auth.changePassword, {
     method: "PATCH",

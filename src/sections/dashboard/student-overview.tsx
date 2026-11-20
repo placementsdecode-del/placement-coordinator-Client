@@ -1,22 +1,80 @@
-import { getAssessmentCatalog, getReadiness } from '@/services/readiness.api.service';
-import { listGroups } from '@/services/groups.api.service';
-import { listNotifications } from '@/services/notifications.api.service';
-import { useCommunityData } from '@/sections/community/use-community-data';
-import { LoadError, PageSkeleton } from '@/components/common/loading-state';
-import { SectionIntro } from '@/components/common/section-intro';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { ArrowRight, BookOpen, ClipboardCheck, Compass, ListChecks, TrendingUp, Users } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { SkeletonRows } from '@/components/common/loading-state';
+import { useCommunityData } from '@/sections/community/use-community-data';
+import { getAssessmentSummary } from '@/services/readiness.api.service';
 import type { NavLabel } from '@/types/student';
-const load = async () => { const [catalog, groups, notifications, readiness] = await Promise.all([getAssessmentCatalog(), listGroups(), listNotifications(), getReadiness({})]); return { catalog, groups, notifications, readiness }; };
-export function StudentOverview({ onNavigate }: { onNavigate: (nav: NavLabel) => void }) {
-  const { data, loading, error, refresh } = useCommunityData(load);
-  if (!data && loading) return <PageSkeleton label="Loading your overview" />;
-  if (error || !data) return <LoadError message={error} onRetry={refresh} />;
-  const available = data.catalog.assessments.filter(a => a.status === 'active' && (a.attempts.length < a.attemptsAllowed || a.attempts.some(t => t.status === 'in-progress')));
-  return <><SectionIntro eyebrow="Today" title="Your learning overview" description="Assessments, conversations, and recent activity." /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
-    { label: 'Available assessments', value: available.length, nav: 'Assessments' as NavLabel },
-    { label: 'Unread group messages', value: data.groups.groups.reduce((sum, g) => sum + (g.unreadCount || 0), 0), nav: 'My Groups' as NavLabel },
-    { label: 'Unread notifications', value: data.notifications.unreadCount, nav: 'Tasks & Activities' as NavLabel },
-    { label: 'Assessments completed', value: data.readiness.activity.assessmentsCompleted, nav: 'Progress' as NavLabel },
-  ].map(item => <button key={item.label} onClick={() => onNavigate(item.nav)} className="rounded-xl border bg-white p-5 text-left hover:border-primary"><p className="text-sm text-muted-foreground">{item.label}</p><p className="mt-2 text-3xl font-semibold">{item.value}</p></button>)}</div><div className="grid gap-4 lg:grid-cols-2"><Card><CardHeader><CardTitle>Released assessments</CardTitle></CardHeader><CardContent className="space-y-3">{available.length ? available.slice(0, 5).map(a => <button key={a._id} onClick={() => onNavigate('Assessments')} className="w-full rounded-lg border p-3 text-left"><p className="font-medium">{a.title}</p><p className="text-sm text-muted-foreground">{a.category} · {a.durationMinutes} minutes</p></button>) : <p>No assessments waiting for you.</p>}</CardContent></Card><Card><CardHeader><CardTitle>Recent learning activity</CardTitle></CardHeader><CardContent>{data.readiness.daily.some(day => day.minutes > 0) ? <div className="flex h-40 items-end gap-1" role="img" aria-label="Learning minutes over the last 14 days">{data.readiness.daily.slice(-14).map(day => <div key={day.day} className="flex h-full flex-1 items-end" title={`${day.day}: ${day.minutes} minutes`}><div className="w-full rounded-t bg-primary" style={{ height: `${Math.max(2, day.minutes / Math.max(...data.readiness.daily.slice(-14).map(d => d.minutes), 1) * 100)}%` }} /></div>)}</div> : <p className="text-sm text-muted-foreground">Your activity graph will appear as you study.</p>}<Button variant="outline" className="mt-4" onClick={() => onNavigate('Progress')}>View progress</Button></CardContent></Card></div><Card><CardHeader><CardTitle>Latest updates</CardTitle></CardHeader><CardContent className="space-y-3">{data.notifications.notifications.slice(0, 5).map(n => <button key={n._id} className="block w-full rounded-lg border p-3 text-left" onClick={() => onNavigate(n.kind === 'assessment' ? 'Assessments' : n.kind === 'invitation' ? 'My Groups' : 'Tasks & Activities')}><span className="font-medium">{!n.read && '• '}{n.title}</span><p className="text-sm text-muted-foreground">{n.message}</p></button>)}{!data.notifications.notifications.length && <p>No new updates.</p>}</CardContent></Card></>;
+
+const shortcuts = [
+  { label: 'Tasks & Activities', description: 'See work and updates from your coordinators.', icon: ListChecks },
+  { label: 'My Groups', description: 'Join discussions and practise with peers.', icon: Users },
+  { label: 'Progress', description: 'Review your results and placement readiness.', icon: TrendingUp },
+] as const;
+
+export function StudentOverview({ onNavigate }: { onNavigate: (nav: NavLabel, itemId?: string) => void }) {
+  const { data, loading, error, refresh } = useCommunityData(getAssessmentSummary);
+  const available = data?.assessments.filter(assessment =>
+    assessment.attempts.length < assessment.attemptsAllowed ||
+    assessment.attempts.some(attempt => attempt.status === 'in-progress')
+  ) || [];
+
+  return (
+    <div className="space-y-5 sm:space-y-6">
+      <section className="rounded-2xl border bg-white p-5 sm:p-7" aria-labelledby="student-overview-title">
+        <h1 id="student-overview-title" className="text-2xl font-semibold tracking-tight sm:text-3xl">Your learning overview</h1>
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+          Pick a topic you want to study, or explore the skills you’ll need for a role you’re interested in.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Button onClick={() => onNavigate('Study Materials')}><BookOpen aria-hidden="true" className="mr-2 h-4 w-4" />Browse study guides</Button>
+          <Button variant="outline" onClick={() => onNavigate('Career Roadmaps')}><Compass aria-hidden="true" className="mr-2 h-4 w-4" />Explore career paths</Button>
+        </div>
+      </section>
+
+      <Card>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+          <CardTitle className="flex items-center gap-2 text-lg"><ClipboardCheck aria-hidden="true" className="h-5 w-5 text-primary" />Assessments</CardTitle>
+          <Button variant="outline" size="sm" onClick={() => onNavigate('Assessments')}>View all</Button>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {error && <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
+            <p role="alert" className="flex-1 text-sm text-muted-foreground">We couldn’t refresh your assessments.</p>
+            <Button variant="outline" size="sm" disabled={loading} onClick={refresh}>Try again</Button>
+          </div>}
+          {!data && loading && <SkeletonRows rows={2} />}
+          {data && (available.length > 0 ? available.slice(0, 5).map(assessment => {
+            const started = assessment.attempts.some(attempt => attempt.status === 'in-progress');
+            return (
+              <button
+                key={assessment._id}
+                type="button"
+                onClick={() => onNavigate('Assessments', assessment._id)}
+                className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-4"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block break-words font-medium">{assessment.title}</span>
+                  <span className="block text-sm text-muted-foreground">{assessment.category} · {assessment.durationMinutes} min</span>
+                </span>
+                <span className="text-sm font-medium text-primary">{started ? 'Resume' : 'Open'}</span>
+                <ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
+              </button>
+            );
+          }) : <p className="text-sm text-muted-foreground">You’re caught up on assigned assessments.</p>)}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {shortcuts.map(({ label, description, icon: Icon }) => (
+          <button key={label} type="button" onClick={() => onNavigate(label)} className="flex items-start gap-3 rounded-xl border bg-white p-4 text-left transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Icon aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <span className="min-w-0">
+              <span className="block font-medium">{label}</span>
+              <span className="mt-1 block text-sm text-muted-foreground">{description}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }

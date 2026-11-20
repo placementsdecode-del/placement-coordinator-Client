@@ -1,11 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Bookmark,
   BriefcaseBusiness,
   Building2,
   Check,
-  ChevronRight,
   Circle,
   Code2,
   FileQuestion,
@@ -40,7 +39,14 @@ function nodeKey(trackId: string, label: string) {
   return `${trackId}::${label}`;
 }
 
-export function CareerRoadmapsSection({ onAction }: { onAction: (message: string) => void }) {
+export function CareerRoadmapsSection({ onAction, studentId, onPractice }: { onAction: (message: string) => void; studentId: string; onPractice: () => void }) {
+  const [saved] = useState(() => {
+    try {
+      const value = JSON.parse(localStorage.getItem(`placement-decode.roadmaps.${studentId}`) || '{}');
+      const strings = (items: unknown): string[] => Array.isArray(items) ? items.filter(item => typeof item === 'string') : [];
+      return { completed: strings(value.completed), started: strings(value.started), bookmarks: strings(value.bookmarks) };
+    } catch { return { completed: [], started: [], bookmarks: [] }; }
+  });
   const [selectedId, setSelectedId] = useState("software");
   const [family, setFamily] = useState<(typeof roadmapFamilies)[number]>("All");
   const [query, setQuery] = useState("");
@@ -50,8 +56,13 @@ export function CareerRoadmapsSection({ onAction }: { onAction: (message: string
   /** Kept out of the track component, which unmounts whenever a milestone page opens. */
   const [markerByTrack, setMarkerByTrack] = useState<Record<string, number>>({});
   const [detailNode, setDetailNode] = useState<RoadmapNode | null>(null);
-  const [completed, setCompleted] = useState<Set<string>>(new Set());
-  const [started, setStarted] = useState<Set<string>>(new Set());
+  const [completed, setCompleted] = useState(() => new Set(saved.completed));
+  const [started, setStarted] = useState(() => new Set(saved.started));
+  const [bookmarks, setBookmarks] = useState(() => new Set(saved.bookmarks));
+  useEffect(() => {
+    try { localStorage.setItem(`placement-decode.roadmaps.${studentId}`, JSON.stringify({ completed: [...completed], started: [...started], bookmarks: [...bookmarks] })); }
+    catch { onAction('This browser couldn’t save your roadmap progress.'); }
+  }, [completed, started, bookmarks, studentId, onAction]);
   const selected = roadmapTracks.find((item) => item.id === selectedId) ?? roadmapTracks[0];
   const filtered = useMemo(() => roadmapTracks.filter((item) => {
     return (family === "All" || item.family === family) && item.title.toLowerCase().includes(query.toLowerCase());
@@ -99,6 +110,12 @@ export function CareerRoadmapsSection({ onAction }: { onAction: (message: string
         status={statusOf(detailNode)}
         onAction={onAction}
         onComplete={() => completeNode(detailNode)}
+        bookmarked={bookmarks.has(nodeKey(selected.id, detailNode.label))}
+        onBookmark={() => setBookmarks(previous => {
+          const next = new Set(previous); const key = nodeKey(selected.id, detailNode.label);
+          if (next.has(key)) next.delete(key); else next.add(key);
+          return next;
+        })}
         onBack={() => setDetailNode(null)}
       />
     );
@@ -200,7 +217,7 @@ export function CareerRoadmapsSection({ onAction }: { onAction: (message: string
             <button key={tab} className={cn("h-9 shrink-0 rounded-md px-3 text-sm font-medium", trackTab === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")} onClick={() => setTrackTab(tab)}>{tab}</button>
           ))}
         </div>
-        <TrackPanel tab={trackTab} track={selected} onAction={onAction} />
+        <TrackPanel tab={trackTab} track={selected} onPractice={onPractice} />
       </section>
     </section>
   );
@@ -210,12 +227,12 @@ function Meta({ label, value }: { label: string; value: string }) {
   return <div className="min-w-[100px] px-3 py-2"><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-0.5 text-sm font-semibold">{value}</p></div>;
 }
 
-function TrackPanel({ tab, track, onAction }: { tab: TrackTab; track: RoadmapTrack; onAction: (message: string) => void }) {
+function TrackPanel({ tab, track, onPractice }: { tab: TrackTab; track: RoadmapTrack; onPractice: () => void }) {
   if (tab === "Projects") return (
-    <div className="divide-y">{track.projects.map((project, index) => <div key={project} className="grid gap-3 px-4 py-4 sm:px-5 md:grid-cols-[40px_minmax(0,1fr)_120px] md:items-center"><span className="text-sm font-semibold text-primary">{String(index + 1).padStart(2, "0")}</span><div><p className="font-semibold">{project}</p><p className="mt-1 text-sm text-muted-foreground">Build, test, document decisions and publish measurable evidence.</p></div><Button size="sm" variant="outline" onClick={() => onAction(`${project} project opened.`)}>View brief</Button></div>)}</div>
+    <div className="divide-y">{track.projects.map((project, index) => <div key={project} className="grid gap-3 px-4 py-4 sm:px-5 md:grid-cols-[40px_minmax(0,1fr)_120px] md:items-center"><span className="text-sm font-semibold text-primary">{String(index + 1).padStart(2, "0")}</span><div><p className="font-semibold">{project}</p><p className="mt-1 text-sm text-muted-foreground">Build, test, document decisions and publish measurable evidence.</p></div><details className="text-sm"><summary className="cursor-pointer font-medium text-primary">View brief</summary><p className="mt-2">Build {project} using {track.nodes.slice(0, 3).map(node => node.label).join(", ")}. Include setup instructions, input validation, error handling, and a demonstration of the completed workflow.</p></details></div>)}</div>
   );
   if (tab === "Interview") return (
-    <div className="divide-y">{track.questions.map((question, index) => <div key={question} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div className="flex gap-3"><span className="text-sm font-semibold text-primary">Q{index + 1}</span><p className="text-sm font-medium">{question}</p></div><Button size="sm" variant="outline" onClick={() => onAction(`Interview answer opened: ${question}`)}>Prepare</Button></div>)}<div className="px-4 py-4 sm:px-5"><Button onClick={() => onAction(`${track.title} mock interview started.`)}><MessageSquareText className="h-4 w-4" />Start mock interview</Button></div></div>
+    <div className="divide-y">{track.questions.map((question, index) => <div key={question} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"><div className="flex gap-3"><span className="text-sm font-semibold text-primary">Q{index + 1}</span><p className="text-sm font-medium">{question}</p></div><details className="min-w-0 sm:w-1/2"><summary className="cursor-pointer text-sm font-medium text-primary">Practise your answer</summary><label className="mt-2 block text-sm">Your explanation<textarea className="mt-1 min-h-24 w-full rounded-lg border p-2" maxLength={5000} /></label></details></div>)}<div className="px-4 py-4 sm:px-5"><Button onClick={onPractice}><MessageSquareText className="h-4 w-4" />Start mock interview</Button></div></div>
   );
   if (tab === "Companies") return (
     <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">{track.companies.map((company) => <div key={company} className="bg-white p-4 sm:p-5"><Building2 className="h-5 w-5 text-primary" /><p className="mt-3 font-semibold">{company}</p><p className="mt-1 text-sm text-muted-foreground">Prepare coding, role fundamentals and project discussion.</p></div>)}</div>
@@ -233,7 +250,7 @@ function Summary({ icon: Icon, title, body, detail }: { icon: typeof Target; tit
   return <div className="bg-white p-4 sm:p-5"><Icon className="h-5 w-5 text-primary" /><p className="mt-3 text-xs font-semibold uppercase text-muted-foreground">{title}</p><p className="mt-1 font-semibold">{body}</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{detail}</p></div>;
 }
 
-function RoadmapNodePage({ track, node, status, onAction, onComplete, onBack }: { track: RoadmapTrack; node: RoadmapNode; status: NodeStatus; onAction: (message: string) => void; onComplete: () => void; onBack: () => void }) {
+function RoadmapNodePage({ track, node, status, onAction, onComplete, onBack, bookmarked, onBookmark }: { bookmarked: boolean; onBookmark: () => void; track: RoadmapTrack; node: RoadmapNode; status: NodeStatus; onAction: (message: string) => void; onComplete: () => void; onBack: () => void }) {
   const [tab, setTab] = useState<DetailTab>("Learn");
   const index = track.nodes.findIndex((item) => item.label === node.label);
   const previous = index > 0 ? track.nodes[index - 1] : null;
@@ -263,7 +280,7 @@ function RoadmapNodePage({ track, node, status, onAction, onComplete, onBack }: 
             ) : (
               <Button onClick={onComplete}><Check className="h-4 w-4" />Mark complete</Button>
             )}
-            <Button variant="outline" onClick={() => onAction(`${node.label} bookmarked.`)}><Bookmark className="h-4 w-4" />Bookmark</Button>
+            <Button variant="outline" aria-pressed={bookmarked} onClick={onBookmark}><Bookmark className="h-4 w-4" />{bookmarked ? "Saved" : "Save milestone"}</Button>
           </div>
         </aside>
       </div>
@@ -286,6 +303,6 @@ function NodePanel({ tab, track, node, concepts, onAction }: { tab: DetailTab; t
   );
 }
 
-function DetailList({ icon: Icon, title, description, items, action, onAction }: { icon: typeof Code2; title: string; description: string; items: string[]; action: string; onAction: (message: string) => void }) {
-  return <div><div className="flex gap-3"><Icon className="mt-0.5 h-5 w-5 text-primary" /><div><h2 className="text-xl font-bold">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div></div><div className="mt-5 divide-y border-y">{items.map((item, index) => <div key={`${item}-${index}`} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex gap-3"><span className="text-sm font-semibold text-primary">{String(index + 1).padStart(2, "0")}</span><p className="text-sm font-medium">{item}</p></div><Button size="sm" variant="outline" onClick={() => onAction(`${action}: ${item}`)}>{action}<ChevronRight className="h-4 w-4" /></Button></div>)}</div></div>;
+function DetailList({ icon: Icon, title, description, items, action }: { icon: typeof Code2; title: string; description: string; items: string[]; action: string; onAction: (message: string) => void }) {
+  return <div><div className="flex gap-3"><Icon className="mt-0.5 h-5 w-5 text-primary" /><div><h2 className="text-xl font-bold">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div></div><div className="mt-5 divide-y border-y">{items.map((item, index) => <div key={`${item}-${index}`} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex gap-3"><span className="text-sm font-semibold text-primary">{String(index + 1).padStart(2, "0")}</span><p className="text-sm font-medium">{item}</p></div><details className="min-w-0 sm:w-1/2"><summary className="cursor-pointer text-sm font-medium text-primary">{action}</summary><label className="mt-2 block text-sm">Your response<textarea maxLength={10000} className="mt-1 min-h-28 w-full rounded-lg border p-3" /></label></details></div>)}</div></div>;
 }

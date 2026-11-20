@@ -54,7 +54,7 @@ export function LandingScreen({ onEnterDemo }: { onEnterDemo: () => void }) {
               One workspace to monitor <span className="text-primary">student progress</span> from practice to placement.
             </h1>
             <p className="max-w-xl text-base leading-7 text-muted-foreground">
-              PlacePrep brings tasks, homework, assessments, coding practice, roadmaps, and study materials into a
+              Placement Decode brings tasks, homework, assessments, coding practice, roadmaps, and study materials into a
               progress-first student dashboard so readiness is visible, measurable, and easy to improve.
             </p>
             <div className="flex flex-wrap gap-3 pt-1">
@@ -153,7 +153,7 @@ export function LandingScreen({ onEnterDemo }: { onEnterDemo: () => void }) {
       <footer className="border-t bg-white/70">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-6 text-sm text-muted-foreground sm:flex-row sm:px-6">
           <BrandLogo subtitle="Placement prep" />
-          <p>PlacePrep · Learn &amp; get placement-ready</p>
+          <p>Placement Decode · Learn &amp; get placement-ready</p>
         </div>
       </footer>
     </div>

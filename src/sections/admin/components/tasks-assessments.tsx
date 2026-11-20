@@ -1,5 +1,7 @@
+import { ResourcePanel } from '@/components/common/resource-panel';
+import type { ResourceStatus } from '@/hooks/use-api-resource';
 import { listGroups } from '@/services/groups.api.service';
-import { useCommunityData } from '@/sections/community/use-community-data';
+import { useApiResource } from '@/hooks/use-api-resource';
 import { AssessmentReviewQueue } from '@/sections/readiness/assessment-attempts';
 import { Breadcrumbs } from '@/components/common/breadcrumbs';
 import { useState } from "react";
@@ -15,19 +17,22 @@ import { Input } from "@/components/ui/input";
 import type { AdminAssessment, SectionRow } from "@/types/admin";
 
 export function AssessmentsAdmin({
+  assessmentsStatus, sectionsStatus,
   assessments,
   sections,
   onCreateValidatedAssessment,
   loading,
   onPublish,
 }: {
+  assessmentsStatus: ResourceStatus; sectionsStatus: ResourceStatus;
   assessments: AdminAssessment[];
   sections: SectionRow[];
   onCreateValidatedAssessment: (assessment: AdminAssessment & { difficulty?: string; attemptsAllowed?: number; passingPercentage?: number; questions: Array<{ id: string; type: string; text: string; options: string[]; marks: string; correctAnswer?: string }> }) => Promise<void>;
   loading: boolean;
   onPublish: (id: string) => Promise<void>;
 }) {
-  const { data: groupData } = useCommunityData(listGroups);
+  const groupsResource = useApiResource(listGroups, { groups: [] as import("@/types/community").StudentGroup[] });
+  const groupData = groupsResource.data;
   const [opened, setOpened] = useState("");
   const [creating, setCreating] = useState(false);
   const [publishing, setPublishing] = useState("");
@@ -127,6 +132,8 @@ export function AssessmentsAdmin({
                 {sections.map((section) => <option key={section.id} value={section.id}>{section.name} · {section.code}</option>)}
 
               </select>
+              <ResourcePanel resource={sectionsStatus} label="Cohort choices" />
+              <ResourcePanel resource={groupsResource} label="Group choices" />
               <FieldError message={errors.assignedTo} />
               </div>
 
@@ -211,14 +218,14 @@ export function AssessmentsAdmin({
         </Card>
         <AssessmentPreview title={previewTitle} type={type} assignedTo={sections.find(section => section.id === assignedTo)?.name || "Unassigned"} instructions={instructions} rubric={rubric} questions={questions} />
       </section>}
-      {!opened && <Card>
+      {!opened && <ResourcePanel resource={assessmentsStatus} label="Assessments"><Card>
         <CardHeader>
           <CardTitle>Assessment Board</CardTitle>
           <CardDescription>Created assessments and publish state.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {publishError && <p role="alert" className="text-destructive">{publishError}</p>}
-          {loading ? <SkeletonRows rows={3} /> : assessments.length ? assessments.map((assessment) => (
+          {loading && !assessments.length ? <SkeletonRows rows={3} /> : assessments.length ? assessments.map((assessment) => (
             <div key={assessment.id} className="rounded-lg border p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <button className="text-left font-semibold hover:text-primary" onClick={() => setOpened(assessment.id)}>{assessment.title}</button>
@@ -232,7 +239,7 @@ export function AssessmentsAdmin({
             <EmptyState icon={FileText} title="No assessments yet" description="Create and validate an assessment before publishing it to students." />
           )}
         </CardContent>
-      </Card>}
+      </Card></ResourcePanel>}
     </>
   );
 }

@@ -1,8 +1,11 @@
+import { listOrganizations, updateOrganization } from '@/services/organizations.api.service';
+import { useCommunityData } from '@/sections/community/use-community-data';
+import { PageSkeleton, LoadError } from '@/components/common/loading-state';
+import type { AcceptedOrganization } from '@/types/api';
 import { useState } from "react";
 import { BarChart3, Layers, Users } from "lucide-react";
 import { ChangePasswordCard } from "@/components/common/change-password-card";
 import { EmptyState } from "@/components/common/empty-state";
-import { InfoTile } from "@/components/common/admin-primitives";
 import { DonutProgress } from "@/components/common/donut-progress";
 import { SectionIntro } from "@/components/common/section-intro";
 import { Badge } from "@/components/ui/badge";
@@ -165,91 +168,42 @@ export function PlacementStudentList({
   );
 }
 
-export function SettingsAdmin({ onAction }: { onAction: (message: string) => void }) {
-  const [orgName, setOrgName] = useState("");
-  const [shortName, setShortName] = useState("");
-  const [academicYear, setAcademicYear] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [defaultDepartment, setDefaultDepartment] = useState("");
-  const [studentPortalTitle, setStudentPortalTitle] = useState("");
-  const [supportContact, setSupportContact] = useState("");
-  const [brandColor, setBrandColor] = useState("#153E9F");
+export function SettingsAdmin() {
+  const { data, loading, error, refresh } = useCommunityData(listOrganizations);
+  if (!data && loading) return <PageSkeleton label="Loading organization settings" />;
+  if (!data) return <LoadError message={error} onRetry={refresh} />;
+  const organization = data[0];
+  return <section className="space-y-5">
+    <SectionIntro eyebrow="Settings" title="Organization settings" description="Update your organization’s contact details." />
+    {organization && <OrganizationSettingsForm key={organization._id} organization={organization} />}
+    <ChangePasswordCard />
+  </section>;
+}
 
-  return (
-    <>
-      <SectionIntro
-        eyebrow="Settings"
-        title="Organization profile and student portal defaults."
-        description="The uploaded organization profile becomes the default branding, contact, academic year, and support information shown to students."
-      />
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Organization Profile</CardTitle>
-            <CardDescription>These values become defaults for student accounts under this organization.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid max-w-3xl gap-3 md:grid-cols-2">
-              <Input placeholder="Organization name" value={orgName} onChange={(event) => setOrgName(event.target.value)} />
-              <Input placeholder="Short name" value={shortName} onChange={(event) => setShortName(event.target.value)} />
-              <Input placeholder="Academic year" value={academicYear} onChange={(event) => setAcademicYear(event.target.value)} />
-              <Input placeholder="Admin contact email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} />
-              <Input placeholder="Default department" value={defaultDepartment} onChange={(event) => setDefaultDepartment(event.target.value)} />
-              <Input placeholder="Student support contact" value={supportContact} onChange={(event) => setSupportContact(event.target.value)} />
-              <Input className="md:col-span-2" placeholder="Student portal title" value={studentPortalTitle} onChange={(event) => setStudentPortalTitle(event.target.value)} />
-            </div>
-            <div className="grid gap-3 md:grid-cols-[140px_minmax(0,1fr)]">
-              <div className="rounded-lg border bg-background p-4 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-lg text-xl font-black text-white" style={{ backgroundColor: brandColor }}>
-                  {shortName.slice(0, 2).toUpperCase()}
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">Logo preview</p>
-              </div>
-              <div className="space-y-3">
-                <Input placeholder="Logo file name or URL" />
-                <Input placeholder="Brand color" value={brandColor} onChange={(event) => setBrandColor(event.target.value)} />
-                <Button variant="outline" onClick={() => onAction("Organization logo upload selected.")}>
-                  Upload Organization Logo
-                </Button>
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Button onClick={() => onAction("Organization profile saved and applied as student defaults.")}>
-                Save Organization Defaults
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Student Default Preview</CardTitle>
-            <CardDescription>What new students will inherit after login.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg border bg-primary/5 p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg text-sm font-black text-white" style={{ backgroundColor: brandColor }}>
-                  {shortName.slice(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <p className="font-bold">{studentPortalTitle}</p>
-                  <p className="text-sm text-muted-foreground">{shortName} · {academicYear}</p>
-                </div>
-              </div>
-            </div>
-            <div className="grid gap-3 text-sm">
-              <InfoTile label="Default organization" value={orgName} />
-              <InfoTile label="Default department owner" value={defaultDepartment} />
-              <InfoTile label="Student support" value={supportContact} />
-              <InfoTile label="Admin contact" value={contactEmail} />
-            </div>
-          </CardContent>
-        </Card>
-        <ChangePasswordCard />
-        </div>
-      </section>
-    </>
-  );
+function OrganizationSettingsForm({ organization }: { organization: AcceptedOrganization }) {
+  const [orgName, setOrgName] = useState(organization.orgName);
+  const [orgEmail, setOrgEmail] = useState(organization.orgEmail);
+  const [phoneNumber, setPhoneNumber] = useState(organization.phoneNumber);
+  const [address, setAddress] = useState(organization.address);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  return <Card><CardHeader><CardTitle>Organization details</CardTitle></CardHeader><CardContent>
+    <form className="space-y-4" onSubmit={async event => {
+      event.preventDefault(); setPending(true); setError(''); setMessage('');
+      try { const response = await updateOrganization(organization._id, { orgName, orgEmail, phoneNumber, address }); setMessage(response.message); }
+      catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to update organization'); }
+      finally { setPending(false); }
+    }}>
+      <fieldset disabled={pending} className="grid gap-4 sm:grid-cols-2">
+        <label className="text-sm font-medium">Organization name<Input required value={orgName} onChange={event => setOrgName(event.target.value)} /></label>
+        <label className="text-sm font-medium">Contact email<Input required type="email" value={orgEmail} onChange={event => setOrgEmail(event.target.value)} /></label>
+        <label className="text-sm font-medium">Phone number<Input required type="tel" value={phoneNumber} onChange={event => setPhoneNumber(event.target.value)} /></label>
+        <label className="text-sm font-medium">Address<Input required value={address} onChange={event => setAddress(event.target.value)} /></label>
+        <Button type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save organization details'}</Button>
+      </fieldset>
+      {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+      {message && <p role="status" className="mt-3 text-sm text-primary">{message}</p>}
+    </form>
+  </CardContent></Card>;
 }

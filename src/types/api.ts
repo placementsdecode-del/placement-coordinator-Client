@@ -6,6 +6,8 @@ export type ApiUser = {
   name: string;
   email: string;
   phoneNumber?: string;
+  skills?: string[];
+  resumeUrl?: string;
   registrationNumber?: string;
   department?: string;
   batch?: string;
@@ -48,6 +50,8 @@ export type RegisterOrg = {
 };
 
 export type AcceptedOrganization = {
+  credentialsSentAt?: string | null;
+  memberCounts?: { students: number; coordinators: number; total: number; active: number };
   _id: string;
   registrationRequest: string;
   orgName: string;

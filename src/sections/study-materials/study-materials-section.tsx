@@ -26,21 +26,53 @@ import { guideIdForTitle, loadStudyGuide, studyGuideManifest } from "./study-gui
 import type { StudyGuide } from "./study-guide-schema";
 
 type ChapterTab = GuideView;
+type StudyLocation = { guideId: string; stage: string; topicId?: string; title: string };
+type SavedStudy = { completed: string[]; bookmarks: StudyLocation[]; recent?: StudyLocation };
 
 const flow = ["Fundamentals", "Core", "Intermediate", "Advanced", "Production", "Interview", "Coding", "Projects", "Revision"];
 const tabs: ChapterTab[] = ["Learn", "Examples", "Visualize", "Code", "Practice", "Interview", "Revision", "Notes"];
 
-export function StudyMaterialsSection({ onAction }: { onAction: (message: string) => void }) {
+function readSavedStudy(key: string): SavedStudy {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) || '{}');
+    const isLocation = (value: unknown): value is StudyLocation => {
+      if (!value || typeof value !== 'object') return false;
+      const item = value as Partial<StudyLocation>;
+      return typeof item.guideId === 'string' && typeof item.stage === 'string' && typeof item.title === 'string' && (item.topicId === undefined || typeof item.topicId === 'string');
+    };
+    return {
+      completed: Array.isArray(saved.completed) ? saved.completed.filter((item: unknown) => typeof item === 'string') : [],
+      bookmarks: Array.isArray(saved.bookmarks) ? saved.bookmarks.filter(isLocation) : [],
+      recent: isLocation(saved.recent) ? saved.recent : undefined,
+    };
+  } catch {
+    return { completed: [], bookmarks: [] };
+  }
+}
+
+export function StudyMaterialsSection({ onAction, studentId }: { onAction: (message: string) => void; studentId: string }) {
+  const storageKey = `placement-decode.study.${studentId}`;
+  const [saved, setSaved] = useState(() => readSavedStudy(storageKey));
+  const [storageUnavailable, setStorageUnavailable] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<MaterialCategory | "All">("All");
-  const [selectedTech, setSelectedTech] = useState("Java");
+  const [selectedTech, setSelectedTech] = useState(() => studyGuideManifest.find(item => item.id === saved.recent?.guideId)?.title || "Java");
   const [activeStage, setActiveStage] = useState("Fundamentals");
+  const [startingTopic, setStartingTopic] = useState<string>();
   const [activeTab, setActiveTab] = useState<ChapterTab>("Learn");
   const [chapterOpen, setChapterOpen] = useState(false);
   const [guide, setGuide] = useState<StudyGuide | null>(null);
   const [guideLoading, setGuideLoading] = useState(true);
   const [guideError, setGuideError] = useState<string | null>(null);
-  const [completedTopics, setCompletedTopics] = useState<Set<string>>(new Set());
+  const completedTopics = useMemo(() => new Set(saved.completed), [saved.completed]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(saved));
+    } catch {
+      setStorageUnavailable(true);
+    }
+  }, [saved, storageKey]);
 
   useEffect(() => {
     const id = guideIdForTitle(selectedTech);
@@ -74,26 +106,40 @@ export function StudyMaterialsSection({ onAction }: { onAction: (message: string
     ? [...completedTopics].filter((key) => key.startsWith(`${currentGuideId}::`)).length
     : 0;
   const progressPct = totalTopics ? Math.round((completedCount / totalTopics) * 100) : 0;
+  const guideSaved = saved.bookmarks.some(item => item.guideId === currentGuideId && !item.topicId);
+  const recent = saved.recent;
 
   function toggleTopicComplete(guideId: string, topicId: string) {
-    setCompletedTopics((prev) => {
-      const key = `${guideId}::${topicId}`;
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    const key = `${guideId}::${topicId}`;
+    setSaved(previous => ({ ...previous, completed: previous.completed.includes(key) ? previous.completed.filter(item => item !== key) : [...previous.completed, key] }));
+  }
+
+  function toggleBookmark(location: StudyLocation) {
+    const matches = (item: StudyLocation) => item.guideId === location.guideId && item.topicId === location.topicId;
+    setSaved(previous => ({ ...previous, bookmarks: previous.bookmarks.some(matches) ? previous.bookmarks.filter(item => !matches(item)) : [...previous.bookmarks, location] }));
+  }
+
+  function openSaved(location: StudyLocation) {
+    const subject = studyGuideManifest.find(item => item.id === location.guideId);
+    if (!subject) return;
+    setSelectedTech(subject.title);
+    openStage(location.stage, 'Learn', location.topicId, location.guideId);
   }
 
   if (chapterOpen) {
-    if (guideLoading) return <PageSkeleton label={`Loading ${selectedTech} study guide`} />;
+    if (guideLoading || (guide && guide.id !== currentGuideId && !guideError)) return <PageSkeleton label={`Loading ${selectedTech} study guide`} />;
     if (guideError || !guide) return <GuideStatus title="Guide unavailable" description={guideError ?? `The ${selectedTech} guide could not be loaded.`} onBack={() => setChapterOpen(false)} />;
     return (
       <ChapterPage
+        key={`${guide.id}:${activeStage}:${startingTopic || ''}`}
         activeTab={activeTab}
         guide={guide}
         activeStage={activeStage}
+        startingTopic={startingTopic}
         completedTopics={completedTopics}
+        bookmarkIds={new Set(saved.bookmarks.filter(item => item.guideId === guide.id).map(item => item.topicId))}
+        onToggleBookmark={toggleBookmark}
+        onVisit={location => setSaved(previous => ({ ...previous, recent: location }))}
         onToggleComplete={toggleTopicComplete}
         onAction={onAction}
         onBack={() => setChapterOpen(false)}
@@ -102,39 +148,42 @@ export function StudyMaterialsSection({ onAction }: { onAction: (message: string
     );
   }
 
-  function openStage(stage: string, tab: ChapterTab = "Learn") {
+  function openStage(stage: string, tab: ChapterTab = "Learn", topicId?: string, guideId = currentGuideId) {
     setActiveStage(stage);
+    setStartingTopic(topicId);
     setActiveTab(tab);
     setChapterOpen(true);
+    if (guideId) setSaved(previous => ({ ...previous, recent: { guideId, stage, topicId, title: selectedTech } }));
   }
 
   return (
     <section className="min-w-0 space-y-4">
       <header className="flex flex-col gap-4 border-b bg-white px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase text-secondary">Study library</p>
-          <h1 className="mt-1 text-2xl font-bold">Learn deeply. Practise deliberately.</h1>
+          <h1 className="text-2xl font-bold">Study library</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Complete, interview-oriented curricula from first principles to production for {studyGuideManifest.length} subjects.
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => onAction(`${selectedTech} bookmarked.`)} title="Bookmark course">
-            <Bookmark className="h-4 w-4" />
-            <span className="hidden sm:inline">Bookmark</span>
-          </Button>
-          <Button onClick={() => openStage(activeStage)}>
-            <Play className="h-4 w-4" /> Continue
-          </Button>
+          {recent && <Button onClick={() => openSaved(recent)}><Play className="h-4 w-4" /> Continue studying</Button>}
         </div>
       </header>
+
+      {storageUnavailable && <p role="status" className="text-sm text-muted-foreground">This browser couldn’t save your study progress.</p>}
+      {saved.bookmarks.length > 0 && <section aria-labelledby="saved-study-heading" className="rounded-lg border bg-white p-4 sm:p-5">
+        <h2 id="saved-study-heading" className="font-semibold">Saved for later</h2>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {saved.bookmarks.map(item => <Button key={`${item.guideId}:${item.topicId || ''}`} variant="outline" size="sm" className="h-auto max-w-full whitespace-normal text-left" onClick={() => openSaved(item)}><Bookmark aria-hidden="true" className="h-4 w-4 shrink-0" />{item.title}</Button>)}
+        </div>
+      </section>}
 
       <section className="border-y bg-white">
         <div className="flex flex-col gap-3 px-4 py-3 sm:px-5">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
             <div className="relative w-full lg:max-w-xs">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Search subjects" value={query} onChange={(event) => setQuery(event.target.value)} />
+              <Input className="pl-9" aria-label="Search subjects" placeholder="Search subjects" value={query} onChange={(event) => setQuery(event.target.value)} />
             </div>
             <div className="flex gap-1 overflow-x-auto pb-1">
               {(["All", ...materialCategories] as const).map((item) => (
@@ -151,6 +200,7 @@ export function StudyMaterialsSection({ onAction }: { onAction: (message: string
               ))}
             </div>
           </div>
+          {!filteredGuides.length && <p className="text-sm text-muted-foreground">No subjects match your search.</p>}
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
             {filteredGuides.map((item) => (
               <button
@@ -181,6 +231,7 @@ export function StudyMaterialsSection({ onAction }: { onAction: (message: string
             </div>
             <h2 className="mt-2 text-2xl font-bold">{selectedTech}</h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">{selected.purpose}</p>
+            {currentGuideId && <Button className="mt-3" size="sm" variant="outline" aria-pressed={guideSaved} onClick={() => toggleBookmark({ guideId: currentGuideId, stage: 'Fundamentals', title: selectedTech })}><Bookmark aria-hidden="true" className="h-4 w-4" />{guideSaved ? 'Guide saved' : 'Save guide'}</Button>}
           </div>
           <div className="grid grid-cols-3 divide-x rounded-md border text-center lg:min-w-[360px]">
             <Stat label="Progress" value={`${progressPct}%`} />
@@ -194,7 +245,7 @@ export function StudyMaterialsSection({ onAction }: { onAction: (message: string
             <span>Stage</span><span>What you will learn</span><span className="text-right">Action</span>
           </div>
           {flow.map((stage, index) => {
-            const topics = guide?.stages.find((item) => item.title === stage)?.topics.map((topic) => topic.title) ?? topicsForStage(selectedTech, stage);
+            const topics = (guide?.id === currentGuideId ? guide?.stages.find((item) => item.title === stage) : undefined)?.topics.map((topic) => topic.title) ?? topicsForStage(selectedTech, stage);
             return (
               <button
                 key={stage}
@@ -230,7 +281,7 @@ export function StudyMaterialsSection({ onAction }: { onAction: (message: string
         <CompactPanel
           icon={Brain}
           title="Revision queue"
-          description="Spaced review based on weak answers and failed attempts."
+          description="Review the subject’s core concepts and interview questions."
           items={selected.revision.slice(0, 3)}
           action="Start revision"
           onClick={() => openStage("Revision", "Revision")}
@@ -268,23 +319,29 @@ function CompactPanel({ icon: Icon, title, description, items, action, onClick }
   );
 }
 
-function ChapterPage({ activeTab, guide, activeStage, completedTopics, onToggleComplete, onAction, onBack, onChangeTab }: {
+function ChapterPage({ activeTab, guide, activeStage, startingTopic, completedTopics, bookmarkIds, onToggleBookmark, onVisit, onToggleComplete, onAction, onBack, onChangeTab }: {
   activeTab: ChapterTab;
   guide: StudyGuide;
   activeStage: string;
+  startingTopic?: string;
   completedTopics: Set<string>;
+  bookmarkIds: Set<string | undefined>;
+  onToggleBookmark: (location: StudyLocation) => void;
+  onVisit: (location: StudyLocation) => void;
   onToggleComplete: (guideId: string, topicId: string) => void;
   onAction: (message: string) => void;
   onBack: () => void;
   onChangeTab: (tab: ChapterTab) => void;
 }) {
   const stage = guide.stages.find((item) => item.title === activeStage) ?? guide.stages[0];
-  const [topicIndex, setTopicIndex] = useState(0);
+  const [topicIndex, setTopicIndex] = useState(() => Math.max(0, stage.topics.findIndex(item => item.id === startingTopic)));
   const topic = stage.topics[topicIndex] ?? stage.topics[0];
   const topicDone = completedTopics.has(`${guide.id}::${topic.id}`);
+  const topicSaved = bookmarkIds.has(topic.id);
 
   function selectTopic(index: number) {
     setTopicIndex(index);
+    onVisit({ guideId: guide.id, stage: stage.title, topicId: stage.topics[index].id, title: stage.topics[index].title });
     onChangeTab("Learn");
   }
 
@@ -301,7 +358,6 @@ function ChapterPage({ activeTab, guide, activeStage, completedTopics, onToggleC
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <span><strong>{Math.max(stage.topics.length * 2, 2)} hours</strong> estimated</span>
           <span><strong>{stage.topics.length}</strong> topics</span>
-          <span>Source: <strong>{guide.id}.json</strong></span>
         </div>
       </header>
 
@@ -345,7 +401,7 @@ function ChapterPage({ activeTab, guide, activeStage, completedTopics, onToggleC
               <CheckCircle2 className="h-4 w-4" />
               {topicDone ? "Completed" : "Mark complete"}
             </Button>
-            <Button variant="outline" onClick={() => onAction(`${topic.title} bookmarked.`)}><Bookmark className="h-4 w-4" />Bookmark</Button>
+            <Button variant="outline" aria-pressed={topicSaved} onClick={() => onToggleBookmark({ guideId: guide.id, stage: stage.title, topicId: topic.id, title: topic.title })}><Bookmark aria-hidden="true" className="h-4 w-4" />{topicSaved ? 'Topic saved' : 'Save topic'}</Button>
           </div>
         </aside>
       </div>

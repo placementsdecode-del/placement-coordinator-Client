@@ -40,6 +40,8 @@ export type SectionRow = {
 };
 
 export type AdminStudentRow = {
+  skills?: string[];
+  resumeUrl?: string;
   id: string;
   name: string;
   email: string;

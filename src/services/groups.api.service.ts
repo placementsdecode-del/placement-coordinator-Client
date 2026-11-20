@@ -7,6 +7,6 @@ export const inviteToGroup = (id: string, students: string[]) => apiFetch<{ mess
 export const respondToGroupInvitation = (id: string, status: 'accepted' | 'declined') => apiFetch<{ message: string }>(`/api/groups/${id}/invitations/me`, { method: 'PATCH', body: JSON.stringify({ status }) });
 export const listPracticePeers = () => apiFetch<{ peers: import('@/types/community').Peer[] }>('/api/groups/peers');
 export const listFaculty = () => apiFetch<{ faculty: import('@/types/api').ApiUser[] }>('/api/groups/coordinators');
-export const listGroupMessages = (id: string) => apiFetch<{ messages: { _id: string; text: string; sender: import('@/types/community').Peer | null; createdAt: string }[] }>(`/api/groups/${id}/messages`);
+export const listGroupMessages = (id: string, before?: string) => apiFetch<{ messages: { _id: string; text: string; sender: import('@/types/community').Peer | null; createdAt: string }[]; hasMore: boolean }>(`/api/groups/${id}/messages${before ? `?before=${encodeURIComponent(before)}` : ''}`);
 export const sendGroupMessage = (id: string, text: string) => apiFetch(`/api/groups/${id}/messages`, { method: 'POST', body: JSON.stringify({ text }) });
 export const assignGroupCoordinators = (id: string, coordinators: string[]) => apiFetch(`/api/groups/${id}/coordinators`, { method: 'PATCH', body: JSON.stringify({ coordinators }) });

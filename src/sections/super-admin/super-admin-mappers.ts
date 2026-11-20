@@ -26,9 +26,9 @@ export function mapOrganization(organization: AcceptedOrganization): Organizatio
     name: organization.orgName,
     plan: featureNames(organization.features) || "Custom",
     status: organization.status === "active" ? "Active" : "Suspended",
-    students: 0,
-    coordinators: organization.adminUser ? 1 : 0,
-    usage: organization.status === "active" ? 72 : 28,
+    students: organization.memberCounts?.students ?? 0,
+    coordinators: organization.memberCounts?.coordinators ?? 0,
+    usage: organization.memberCounts?.total ? Math.round(organization.memberCounts.active / organization.memberCounts.total * 100) : 0,
     region: organization.address,
   };
 }

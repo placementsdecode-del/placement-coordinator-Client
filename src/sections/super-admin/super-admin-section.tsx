@@ -29,6 +29,7 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
   const [permissions, setPermissions] = useState<string[]>([]);
   const [platformLoading, setPlatformLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [approvalCredentials, setApprovalCredentials] = useState<{ email: string; password: string } | null>(null);
   const [selectedOrgId, setSelectedOrgId] = useState(orgRows[0]?.id ?? "");
   const selectedOrg = orgRows.find((org) => org.id === selectedOrgId) ?? orgRows[0] ?? null;
 
@@ -87,16 +88,18 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
   async function handleRequest(requestId: string, status: string) {
     try {
       if (status === "Approved") {
-        await approveOrganizationRegistration(requestId, {
+        const response = await approveOrganizationRegistration(requestId, {
           features: requests.find((request) => request.id === requestId)?.featureIds ?? [],
           adminName: "Organization Admin",
           discussionNotes: "Approved from frontend console.",
         });
+        if (response.temporaryPassword) setApprovalCredentials({ email: response.admin.email, password: response.temporaryPassword });
+        onAction(response.message);
       } else {
         await rejectOrganizationRegistration(requestId, { discussionNotes: "Rejected from frontend console." });
       }
       await refreshPlatformData();
-      onAction(`Organization request ${status.toLowerCase()}.`);
+      if (status !== 'Approved') onAction(`Organization request ${status.toLowerCase()}.`);
     } catch (error) {
       onAction(error instanceof Error ? error.message : "Request update failed.");
     }
@@ -104,10 +107,17 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
 
   if (platformLoading) return <PageSkeleton label={`Loading ${activeNav.toLowerCase()}`} />;
   if (loadError) return <LoadError message={loadError} onRetry={() => void refreshPlatformData()} />;
+  const credentialPanel = approvalCredentials && <div role="status" className="space-y-2 rounded-lg border bg-white p-4">
+    <p className="font-semibold">Share these credentials with the organization admin</p>
+    <p className="text-sm">Email delivery was unavailable. The admin will need to change this password after signing in.</p>
+    <p className="break-all text-sm">{approvalCredentials.email}</p>
+    <code className="block break-all select-all">{approvalCredentials.password}</code>
+    <button type="button" className="text-sm font-medium text-primary underline" onClick={() => setApprovalCredentials(null)}>Dismiss credentials</button>
+  </div>;
 
   if (activeNav === "Organizations") {
     return (
-      <OrganizationsPage
+      <>{credentialPanel}<OrganizationsPage
         organizations={orgRows}
         apiOrganizations={apiOrganizations}
         selectedOrg={selectedOrg}
@@ -115,11 +125,21 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
         onSelectOrg={setSelectedOrgId}
         onUpdateDetails={updateOrgDetails}
         onUpdateStatus={updateOrgStatus}
+        onRecoverCredentials={async registrationId => {
+          try {
+            const response = await approveOrganizationRegistration(registrationId, { features: [], adminName: 'Organization Admin', discussionNotes: '' });
+            if (response.temporaryPassword) setApprovalCredentials({ email: response.admin.email, password: response.temporaryPassword });
+            onAction(response.message);
+          } catch (reason) { onAction(reason instanceof Error ? reason.message : 'Unable to recover credentials'); }
+        }}
         loading={platformLoading}
-      />
+      /></>
     );
   }
-  if (activeNav === "Requests") return <RequestsPage requests={requests} loadError={loadError} loading={platformLoading} onHandleRequest={handleRequest} />;
+  if (activeNav === "Requests") return <>
+    {credentialPanel}
+    <RequestsPage requests={requests} loadError={loadError} loading={platformLoading} onHandleRequest={handleRequest} />
+  </>;
   if (activeNav === "Users") return <UsersPage apiUsers={apiUsers} organizations={apiOrganizations} loading={platformLoading} onUserChanged={refreshPlatformData} onAction={onAction} />;
   if (activeNav === "Settings") {
     return (
@@ -134,9 +154,9 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
     );
   }
   if (activeNav === "Features") return <FeaturesPage features={features} loading={platformLoading} onFeatureChanged={refreshPlatformData} onAction={onAction} />;
-  if (activeNav === "Plans") return <PlansPage onAction={onAction} />;
+  if (activeNav === "Plans") return <PlansPage />;
   if (activeNav === "Analytics") return <AnalyticsPage organizations={orgRows} />;
-  if (activeNav === "Support") return <SupportPage onAction={onAction} />;
+  if (activeNav === "Support") return <SupportPage />;
   if (activeNav === "Audit Logs") return <AuditPage />;
   if (activeNav === "Changelog") return <ChangelogPage />;
   

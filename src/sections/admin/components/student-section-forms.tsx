@@ -1,6 +1,7 @@
+import { isValidEmail } from '@/lib/utils';
 import { useEffect, useState } from "react";
 import { LoaderCircle, Plus, UserPlus } from "lucide-react";
-import { FieldError, isValidEmail } from "@/components/common/form-validation";
+import { FieldError } from "@/components/common/form-validation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

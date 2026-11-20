@@ -1,3 +1,5 @@
+import { ResourcePanel } from '@/components/common/resource-panel';
+import type { ResourceStatus } from '@/hooks/use-api-resource';
 import { getReadiness } from '@/services/readiness.api.service';
 import { useCommunityData } from '@/sections/community/use-community-data';
 import { ReadinessView } from '@/sections/readiness/readiness-view';
@@ -49,6 +51,8 @@ export function StudentDetail({
               <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
                 <p>Email: {student.email}</p>
                 <p>Phone: {student.phone}</p>
+                {!!student.skills?.length && <p>Skills · {student.skills.join(', ')}</p>}
+                {student.resumeUrl && <a className="text-primary underline" href={student.resumeUrl} target="_blank" rel="noreferrer">View resume</a>}
               </div>
             </>
           ) : (
@@ -125,8 +129,9 @@ export function StudentsAdmin({
   const [sectionFilter, setSectionFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
   const [search, setSearch] = useState("");
+  const [visibleCount, setVisibleCount] = useState(50);
   const filteredStudents = students.filter((student) =>
-    (sectionFilter === "all" || (student.sectionId || "unassigned") === sectionFilter) &&
+    (sectionFilter === "all" || (student.sectionId || "unassigned") === sectionFilter || student.cohortIds?.includes(sectionFilter)) &&
     `${student.name} ${student.email} ${student.rollNo}`.toLowerCase().includes(search.toLowerCase()),
   );
 
@@ -155,7 +160,7 @@ export function StudentsAdmin({
               className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm md:w-72"
               aria-label="Filter by cohort"
               value={sectionFilter}
-              onChange={(event) => setSectionFilter(event.target.value)}
+              onChange={(event) => { setSectionFilter(event.target.value); setVisibleCount(50); }}
             >
               <option value="all">All students</option>
               <option value="unassigned">Unassigned</option>
@@ -165,8 +170,8 @@ export function StudentsAdmin({
             </select>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Input aria-label="Search students" placeholder="Search name, email or registration number" value={search} onChange={(event) => setSearch(event.target.value)} />
-            {loading ? <SkeletonRows rows={4} /> : filteredStudents.length ? filteredStudents.map((student) => (
+            <Input aria-label="Search students" placeholder="Search name, email or registration number" value={search} onChange={(event) => { setSearch(event.target.value); setVisibleCount(50); }} />
+            {loading ? <SkeletonRows rows={4} /> : filteredStudents.length ? filteredStudents.slice(0, visibleCount).map((student) => (
               <button
                 key={student.id}
                 className={`grid w-full gap-3 rounded-lg border p-3 text-left md:grid-cols-[minmax(0,1fr)_180px_120px] md:items-center ${
@@ -184,6 +189,7 @@ export function StudentsAdmin({
             )) : (
               <EmptyState icon={Users} title={students.length ? "No matching students" : "No students yet"} description={students.length ? "Try a different search or section filter." : "Add your first student and assign a section when ready."} />
             )}
+            {filteredStudents.length > visibleCount && <Button variant="outline" onClick={() => setVisibleCount(count => count + 50)}>Show more students</Button>}
           </CardContent>
         </Card>
         <StudentDetail student={selectedStudent} sections={sections} onMoveStudent={onMoveStudent} />
@@ -193,12 +199,12 @@ export function StudentsAdmin({
 }
 
 
-export function SectionsAdmin({ sections, students, onCreateSection, onUpdateSection, onCreateStudent, onMoveStudent, canManage = true, faculty, assignments, onAssignCoordinators, onRefresh }: {
+export function SectionsAdmin({ sections, students, onCreateSection, onUpdateSection, onCreateStudent, onMoveStudent, canManage = true, studentsStatus, facultyStatus, faculty, assignments, onAssignCoordinators, onRefresh }: {
   sections: SectionRow[]; students: AdminStudentRow[]; selectedSection: SectionRow | null; selectedStudent: AdminStudentRow | null;
   onCreateSection: (section: SectionRow) => Promise<void>; onUpdateSection: (section: SectionRow) => Promise<void>;
   onSelectSection: (id: string) => void; onSelectStudent: (id: string) => void;
   onCreateStudent: Parameters<typeof StudentsAdmin>[0]['onCreateStudent']; onMoveStudent: (id: string, sectionId: string) => Promise<void>;
-  loading: boolean; canManage?: boolean; faculty: ApiUser[]; assignments: Record<string, string[]>;
+  loading: boolean; canManage?: boolean; studentsStatus: ResourceStatus; facultyStatus: ResourceStatus; faculty: ApiUser[]; assignments: Record<string, string[]>;
   onAssignCoordinators: (id: string, teachers: string[]) => Promise<void>; onRefresh: () => Promise<void>;
 }) {
   const [opened, setOpened] = useState(''); const [studentId, setStudentId] = useState(''); const [creating, setCreating] = useState(false); const [editing, setEditing] = useState(false);
@@ -212,11 +218,11 @@ export function SectionsAdmin({ sections, students, onCreateSection, onUpdateSec
     {error && <p role="alert" className="text-destructive">{error}</p>}
     {creating && !opened && <CreateSectionForm onCreateSection={async s => { await onCreateSection(s); setCreating(false); }} />}
     {student && cohort ? <StudentDetail student={student} sections={sections} onMoveStudent={onMoveStudent} /> : cohort ? <>
-      <Card><CardHeader><CardTitle>Coordinators <InfoTip text="Select faculty to monitor this cohort. Assigned coordinators can see its students, publish assessments, and review progress." /></CardTitle><CardDescription>{cohort.description}</CardDescription></CardHeader><CardContent className="space-y-3"><p>{cohort.coordinator}</p>{canManage && <div className="grid gap-2 sm:grid-cols-3">{faculty.map(t => { const id = t.id || t._id || ''; const assigned = assignments[cohort.id] || []; return <label key={id} className="flex gap-2 rounded-lg border p-3 text-sm"><input type="checkbox" checked={assigned.includes(id)} disabled={pending} onChange={e => void run(() => onAssignCoordinators(cohort.id, e.target.checked ? [...assigned, id] : assigned.filter(a => a !== id)))} />{t.name}</label>; })}{!faculty.length && <p>Create a faculty account in Coordinators first.</p>}</div>}</CardContent></Card>
+      <Card><CardHeader><CardTitle>Coordinators <InfoTip text="Select faculty to monitor this cohort. Assigned coordinators can see its students, publish assessments, and review progress." /></CardTitle><CardDescription>{cohort.description}</CardDescription></CardHeader><CardContent className="space-y-3"><p>{cohort.coordinator}</p>{canManage && <ResourcePanel resource={facultyStatus} label="Coordinators"><div className="grid gap-2 sm:grid-cols-3">{faculty.map(t => { const id = t.id || t._id || ''; const assigned = assignments[cohort.id] || []; return <label key={id} className="flex gap-2 rounded-lg border p-3 text-sm"><input type="checkbox" checked={assigned.includes(id)} disabled={pending} onChange={e => void run(() => onAssignCoordinators(cohort.id, e.target.checked ? [...assigned, id] : assigned.filter(a => a !== id)))} />{t.name}</label>; })}{!faculty.length && <p>Create a faculty account in Coordinators first.</p>}</div></ResourcePanel>}</CardContent></Card>
       <div className="flex flex-wrap gap-2">{canManage && <Button variant="outline" onClick={() => setEditing(v => !v)}>Edit cohort</Button>}<Button variant="outline" onClick={() => setAdding(v => !v)}>Add participants</Button></div>
       {editing && <CreateSectionForm initialSection={cohort} onCreateSection={async s => { await onUpdateSection(s); setEditing(false); }} />}
-      {adding && <Card><CardContent className="space-y-4 p-5"><form className="flex flex-wrap gap-2" onSubmit={e => { e.preventDefault(); void run(async () => { await addCohortMember(cohort.id, assignId); await onRefresh(); setAssignId(''); }); }}><select aria-label="Student to add" className="h-11 min-w-0 flex-1 rounded-md border px-3" value={assignId} onChange={e => setAssignId(e.target.value)}><option value="">Select a student</option>{students.filter(s => !belongs(s)).map(s => <option key={s.id} value={s.id}>{s.name} · {s.rollNo}</option>)}</select><Button disabled={pending || !assignId}>Add to cohort</Button><InfoTip text="Students can join multiple cohorts. Adding a student here keeps their existing memberships." /></form>{canManage && <CreateStudentForm sections={sections} initialSectionId={cohort.id} embedded onCreateStudent={onCreateStudent} />}</CardContent></Card>}
-      <h2 className="font-semibold">Participants ({members.length})</h2><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{members.map(s => <Card key={s.id}><CardContent className="p-4"><button className="w-full text-left" onClick={() => setStudentId(s.id)}><p className="font-semibold">{s.name}</p><p className="text-sm text-muted-foreground">{s.rollNo}</p></button><Button variant="ghost" disabled={pending} className="mt-2" onClick={() => void run(async () => { await removeCohortMember(cohort.id, s.id); await onRefresh(); })}>Remove from cohort</Button></CardContent></Card>)}</div>{!members.length && <p className="text-muted-foreground">No participants yet. Add students to this cohort.</p>}
-    </> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{sections.map(s => <button key={s.id} onClick={() => setOpened(s.id)} className="rounded-xl border bg-white p-5 text-left hover:border-primary"><h2 className="font-semibold">{s.name}</h2><p className="mt-2 text-sm text-muted-foreground">{s.description}</p><p className="mt-3 text-sm">{students.filter(u => u.sectionId === s.id || u.cohortIds?.includes(s.id)).length} participants · {s.status}</p><p className="mt-1 text-xs text-muted-foreground">{s.coordinator}</p></button>)}</div>}
+      {adding && <ResourcePanel resource={studentsStatus} label="Available students"><Card><CardContent className="space-y-4 p-5"><form className="flex flex-wrap gap-2" onSubmit={e => { e.preventDefault(); void run(async () => { await addCohortMember(cohort.id, assignId); await onRefresh(); setAssignId(''); }); }}><select aria-label="Student to add" className="h-11 min-w-0 flex-1 rounded-md border px-3" value={assignId} onChange={e => setAssignId(e.target.value)}><option value="">Select a student</option>{students.filter(s => !belongs(s)).map(s => <option key={s.id} value={s.id}>{s.name} · {s.rollNo}</option>)}</select><Button disabled={pending || !assignId}>Add to cohort</Button><InfoTip text="Students can join multiple cohorts. Adding a student here keeps their existing memberships." /></form>{canManage && <CreateStudentForm sections={sections} initialSectionId={cohort.id} embedded onCreateStudent={onCreateStudent} />}</CardContent></Card></ResourcePanel>}
+      <ResourcePanel resource={studentsStatus} label="Participants"><h2 className="font-semibold">Participants ({members.length})</h2><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{members.map(s => <Card key={s.id}><CardContent className="p-4"><button className="w-full text-left" onClick={() => setStudentId(s.id)}><p className="font-semibold">{s.name}</p><p className="text-sm text-muted-foreground">{s.rollNo}</p></button><Button variant="ghost" disabled={pending} className="mt-2" onClick={() => void run(async () => { await removeCohortMember(cohort.id, s.id); await onRefresh(); })}>Remove from cohort</Button></CardContent></Card>)}</div>{!members.length && <p className="text-muted-foreground">No participants yet. Add students to this cohort.</p>}</ResourcePanel>
+    </> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{sections.map(s => <button key={s.id} onClick={() => setOpened(s.id)} className="rounded-xl border bg-white p-5 text-left hover:border-primary"><h2 className="font-semibold">{s.name}</h2><p className="mt-2 text-sm text-muted-foreground">{s.description}</p><p className="mt-3 text-sm">{studentsStatus.initialized ? students.filter(u => u.sectionId === s.id || u.cohortIds?.includes(s.id)).length : "…"} participants · {s.status}</p><p className="mt-1 text-xs text-muted-foreground">{s.coordinator}</p></button>)}</div>}
   </>;
 }

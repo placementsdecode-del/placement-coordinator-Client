@@ -1,7 +1,8 @@
+import { isValidEmail } from '@/lib/utils';
 import { useState } from "react";
 import { LoaderCircle, ShieldCheck, UserPlus } from "lucide-react";
 import { EmptyState } from "@/components/common/empty-state";
-import { FieldError, isValidEmail } from "@/components/common/form-validation";
+import { FieldError } from "@/components/common/form-validation";
 import { SkeletonRows } from "@/components/common/loading-state";
 import { SectionIntro } from "@/components/common/section-intro";
 import { Badge } from "@/components/ui/badge";

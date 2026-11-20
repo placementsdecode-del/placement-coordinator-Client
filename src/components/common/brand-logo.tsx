@@ -9,7 +9,7 @@ export function BrandLogo({ compact = false, subtitle = "Student" }: { compact?:
       </div>
       {!compact ? (
         <div className="min-w-0">
-          <p className={cn("truncate text-sm font-bold", compact && "sr-only")}>PlacePrep</p>
+          <p className={cn("truncate text-sm font-bold", compact && "sr-only")}>Placement Decode</p>
           <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
         </div>
       ) : null}

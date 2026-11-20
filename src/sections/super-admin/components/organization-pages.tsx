@@ -1,9 +1,10 @@
+import { isValidEmail } from '@/lib/utils';
 import { useEffect, useState } from "react";
 import { Building2, Check, LoaderCircle, Mail, MapPin, Phone, ShieldCheck, Users, X, type LucideIcon } from "lucide-react";
 import { ApiNotice, InfoTile } from "@/components/common/admin-primitives";
 import { DonutProgress } from "@/components/common/donut-progress";
 import { EmptyState } from "@/components/common/empty-state";
-import { FieldError, isValidEmail } from "@/components/common/form-validation";
+import { FieldError } from "@/components/common/form-validation";
 import { SkeletonRows } from "@/components/common/loading-state";
 import { SectionIntro } from "@/components/common/section-intro";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,7 @@ export function OrganizationsPage({
   onSelectOrg,
   onUpdateDetails,
   onUpdateStatus,
+  onRecoverCredentials,
 }: {
   organizations: OrganizationRow[];
   apiOrganizations: AcceptedOrganization[];
@@ -31,6 +33,7 @@ export function OrganizationsPage({
   onSelectOrg: (orgId: string) => void;
   onUpdateDetails: (orgId: string, payload: Partial<AcceptedOrganization>) => Promise<void>;
   onUpdateStatus: (orgId: string, status: string) => Promise<void>;
+  onRecoverCredentials: (registrationId: string) => Promise<void>;
 }) {
   const selectedApiOrg = selectedOrg ? apiOrganizations.find((organization) => organization._id === selectedOrg.id) : undefined;
   const [form, setForm] = useState({
@@ -44,6 +47,7 @@ export function OrganizationsPage({
     address: selectedApiOrg?.address ?? selectedOrg?.region ?? "",
   });
   const [savingDetails, setSavingDetails] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -58,7 +62,20 @@ export function OrganizationsPage({
       postalCode: selectedApiOrg?.location?.postalCode ?? "",
       address: selectedApiOrg?.address ?? selectedOrg?.region ?? "",
     });
-  }, [selectedApiOrg?._id, selectedOrg?.id]);
+  }, [
+    selectedApiOrg?._id,
+    selectedApiOrg?.orgName,
+    selectedApiOrg?.orgEmail,
+    selectedApiOrg?.phoneNumber,
+    selectedApiOrg?.location?.country,
+    selectedApiOrg?.location?.state,
+    selectedApiOrg?.location?.city,
+    selectedApiOrg?.location?.postalCode,
+    selectedApiOrg?.address,
+    selectedOrg?.id,
+    selectedOrg?.name,
+    selectedOrg?.region,
+  ]);
 
   async function submitDetails(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -162,7 +179,12 @@ export function OrganizationsPage({
                     ))}
                   </div>
                 </div>
-                <DonutProgress value={selectedOrg.usage} label="Usage" caption="Current tenant resource usage" />
+                <DonutProgress value={selectedOrg.usage} label="Active accounts" caption="Accounts enabled for sign-in" />
+                {selectedApiOrg && !selectedApiOrg.credentialsSentAt && <Button variant="outline" disabled={recovering} onClick={async () => {
+                  setRecovering(true);
+                  try { await onRecoverCredentials(selectedApiOrg.registrationRequest); }
+                  finally { setRecovering(false); }
+                }}>{recovering ? 'Recovering…' : 'Recover undelivered admin credentials'}</Button>}
               </>
             ) : (
               <EmptyState icon={Users} title="No organization selected" description="Select an organization after one is approved." />

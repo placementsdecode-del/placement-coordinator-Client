@@ -17,10 +17,18 @@ export type CreateUserPayload = {
   password?: string;
 };
 
-export function listUsers(organizationId?: string | null) {
-  return apiFetch<{ users: ApiUser[] }>(API_ENDPOINTS.users.list(organizationId)).then((response) =>
-    response.users.map((user) => ({ ...user, id: user.id || user._id || "" })),
-  );
+export async function listUsers(organizationId?: string | null) {
+  const users: ApiUser[] = [];
+  let before: string | null = null;
+  do {
+    const params = new URLSearchParams({ limit: '200' });
+    if (organizationId) params.set('organization', organizationId);
+    if (before) params.set('before', before);
+    const page = await apiFetch<{ users: ApiUser[]; nextCursor?: string | null }>(`/api/users?${params}`);
+    users.push(...page.users.map(user => ({ ...user, id: user.id || user._id || '' })));
+    before = page.nextCursor || null;
+  } while (before);
+  return users;
 }
 
 export function createUser(payload: CreateUserPayload) {

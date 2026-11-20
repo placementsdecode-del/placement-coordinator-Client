@@ -12,6 +12,7 @@ export function ChangePasswordCard({ mustChangePassword = false }: { mustChangeP
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [changed, setChanged] = useState(false);
 
   async function submitPassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,6 +31,7 @@ export function ChangePasswordCard({ mustChangePassword = false }: { mustChangeP
       setNewPassword("");
       setConfirmPassword("");
       setMessage(response.message || "Password changed successfully.");
+      setChanged(true);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Password change failed.");
     } finally {
@@ -45,14 +47,14 @@ export function ChangePasswordCard({ mustChangePassword = false }: { mustChangeP
           Change Password
         </CardTitle>
         <CardDescription>
-          {mustChangePassword ? "Replace your temporary password before regular use." : "Update your account password."}
+          {mustChangePassword && !changed ? "Replace your temporary password before regular use." : "Update your account password."}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form className="grid gap-3" onSubmit={submitPassword}>
-          <Input required type="password" placeholder="Current password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
-          <Input required minLength={8} type="password" placeholder="New password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
-          <Input required minLength={8} type="password" placeholder="Confirm new password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+          <Input required aria-label="Current password" autoComplete="current-password" type="password" placeholder="Current password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
+          <Input required aria-label="New password" autoComplete="new-password" minLength={8} type="password" placeholder="New password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+          <Input required aria-label="Confirm new password" autoComplete="new-password" minLength={8} type="password" placeholder="Confirm new password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
           {error ? <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p> : null}
           {message ? <p className="rounded-md border border-primary/25 bg-primary/10 p-3 text-sm font-medium text-primary">{message}</p> : null}
           <Button type="submit" disabled={isSubmitting}>

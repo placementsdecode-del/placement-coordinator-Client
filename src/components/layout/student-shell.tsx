@@ -1,6 +1,6 @@
 import { Breadcrumbs } from '@/components/common/breadcrumbs';
 import { useLearningTracker } from "@/sections/readiness/learning-tracker";
-import { getMySection } from "@/services/community.api.service";
+import { getMySectionSummary } from "@/services/community.api.service";
 import { useCommunityData } from "@/sections/community/use-community-data";
 import { NotificationCenter } from "@/sections/community/notification-center";
 import type { ReactNode } from "react";
@@ -30,7 +30,7 @@ export function StudentShell({
   sidebarCollapsed: boolean;
   toastMessage: string;
   children: ReactNode;
-  onChangeNav: (nav: NavLabel) => void;
+  onChangeNav: (nav: NavLabel, itemId?: string) => void;
   onCloseMenu: () => void;
   onOpenMenu: () => void;
   onToggleSidebar: () => void;
@@ -38,7 +38,7 @@ export function StudentShell({
   onDismissToast: () => void;
 }) {
   const trackingError = useLearningTracker(activeNav);
-  const { data: community } = useCommunityData(getMySection);
+  const { data: community } = useCommunityData(getMySectionSummary);
   return (
     <main className="min-h-screen overflow-x-hidden bg-background">
       {mobileMenuOpen ? (
