@@ -45,6 +45,20 @@
 }
 
 @layer components {
+  .panel-scroll {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 #f1f5f9;
+  }
+
+  .panel-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .panel-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 8px; }
+  .panel-scroll::-webkit-scrollbar-thumb { background: #94a3b8; border: 2px solid #f1f5f9; border-radius: 8px; }
+  .panel-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
   .roadmap-pulse {
     animation: roadmap-pulse-glow 2.2s ease-in-out infinite;
   }

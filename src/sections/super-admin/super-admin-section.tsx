@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PageSkeleton, LoadError } from "@/components/common/loading-state";
 
@@ -13,7 +13,8 @@ import { listPermissions, listRoles } from "@/services/roles.api.service";
 import { listUsers } from "@/services/users.api.service";
 import { mapOrganization, mapRegistration } from "@/sections/super-admin/super-admin-mappers";
 import { UsersPage, FeaturesPage, RolesSettingsPage } from "@/sections/super-admin/components/access-pages";
-import { OrganizationsPage, RequestsPage } from "@/sections/super-admin/components/organization-pages";
+import { RequestsPage } from "@/sections/super-admin/components/organization-pages";
+import { OrganizationsPage } from "@/sections/super-admin/components/organizations-page";
 import { AnalyticsPage, AuditPage, ChangelogPage, PlansPage, SupportPage } from "@/sections/super-admin/components/platform-pages";
 import { SuperAdminDashboard } from "@/sections/super-admin/components/super-admin-dashboard";
 import type { AcceptedOrganization, ApiRole, ApiUser, Feature } from "@/types/api";
@@ -32,19 +33,23 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
   const [approvalCredentials, setApprovalCredentials] = useState<{ email: string; password: string } | null>(null);
   const [selectedOrgId, setSelectedOrgId] = useState(orgRows[0]?.id ?? "");
   const selectedOrg = orgRows.find((org) => org.id === selectedOrgId) ?? orgRows[0] ?? null;
+  const loadVersion = useRef(0);
 
-  async function refreshPlatformData() {
+  const refreshPlatformData = useCallback(async () => {
+    const version = ++loadVersion.current;
     setLoadError("");
     setPlatformLoading(true);
     try {
+      const needsOrganizations = ['Dashboard', 'Organizations', 'Users', 'Analytics', 'Settings'].includes(activeNav);
       const [registrations, acceptedOrganizations, users, featureRows, roleRows, permissionRows] = await Promise.all([
-        listOrganizationRegistrations("pending"),
-        listOrganizations(),
-        listUsers(),
-        listFeatures(),
-        listRoles(),
-        listPermissions(),
+        ['Dashboard', 'Requests'].includes(activeNav) ? listOrganizationRegistrations("pending") : Promise.resolve([]),
+        needsOrganizations ? listOrganizations() : Promise.resolve([]),
+        activeNav === 'Users' ? listUsers() : Promise.resolve([]),
+        ['Organizations', 'Features'].includes(activeNav) ? listFeatures() : Promise.resolve([]),
+        activeNav === 'Settings' ? listRoles() : Promise.resolve([]),
+        activeNav === 'Settings' ? listPermissions() : Promise.resolve([]),
       ]);
+      if (version !== loadVersion.current) return;
       const mappedOrganizations = acceptedOrganizations.map(mapOrganization);
       setRequests(registrations.map(mapRegistration));
       setApiOrganizations(acceptedOrganizations);
@@ -55,34 +60,29 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
       setPermissions(permissionRows);
       setSelectedOrgId((current) => mappedOrganizations.find((org) => org.id === current)?.id ?? mappedOrganizations[0]?.id ?? current);
     } catch (error) {
+      if (version !== loadVersion.current) return;
       setLoadError(error instanceof Error ? error.message : "Unable to load platform data.");
     } finally {
-      setPlatformLoading(false);
+      if (version === loadVersion.current) setPlatformLoading(false);
     }
-  }
+  }, [activeNav]);
 
   useEffect(() => {
-    refreshPlatformData();
-  }, []);
+    void refreshPlatformData();
+    return () => { loadVersion.current += 1; };
+  }, [refreshPlatformData]);
 
   async function updateOrgStatus(orgId: string, status: string) {
-    try {
-      await updateOrganization(orgId, { status: status === "Active" ? "active" : "suspended" });
-      await refreshPlatformData();
-      onAction(`Organization ${status.toLowerCase()}.`);
-    } catch (error) {
-      onAction(error instanceof Error ? error.message : "Organization update failed.");
-    }
+    await updateOrgDetails(orgId, { status: status === "Active" ? "active" : "suspended" });
   }
 
   async function updateOrgDetails(orgId: string, payload: Partial<AcceptedOrganization>) {
-    try {
-      await updateOrganization(orgId, payload);
-      await refreshPlatformData();
-      onAction("Organization details updated.");
-    } catch (error) {
-      onAction(error instanceof Error ? error.message : "Organization update failed.");
-    }
+    const { organization } = await updateOrganization(orgId, payload);
+    // Keep the current panel, scroll position, and account counts during edits.
+    const current = apiOrganizations.find(item => item._id === orgId);
+    const updated = { ...current, ...organization, memberCounts: current?.memberCounts };
+    setApiOrganizations(items => items.map(item => item._id === orgId ? updated : item));
+    setOrgRows(items => items.map(item => item.id === orgId ? mapOrganization(updated) : item));
   }
 
   async function handleRequest(requestId: string, status: string) {
@@ -120,6 +120,7 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
       <>{credentialPanel}<OrganizationsPage
         organizations={orgRows}
         apiOrganizations={apiOrganizations}
+        features={features}
         selectedOrg={selectedOrg}
         loadError={loadError}
         onSelectOrg={setSelectedOrgId}
@@ -130,7 +131,7 @@ export function SuperAdminSection({ activeNav, onAction }: { activeNav: SuperAdm
             const response = await approveOrganizationRegistration(registrationId, { features: [], adminName: 'Organization Admin', discussionNotes: '' });
             if (response.temporaryPassword) setApprovalCredentials({ email: response.admin.email, password: response.temporaryPassword });
             onAction(response.message);
-          } catch (reason) { onAction(reason instanceof Error ? reason.message : 'Unable to recover credentials'); }
+          } catch (reason) { throw reason instanceof Error ? reason : new Error('Unable to recover credentials'); }
         }}
         loading={platformLoading}
       /></>

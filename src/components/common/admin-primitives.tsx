@@ -1,9 +1,7 @@
+import { Notice } from '@/components/common/notice';
+
 export function ApiNotice({ message }: { message: string }) {
-  return (
-    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-      API data unavailable: {message}
-    </div>
-  );
+  return <Notice tone="warning">API data unavailable: {message}</Notice>;
 }
 
 export function InfoTile({ label, value }: { label: string; value: string }) {

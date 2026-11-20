@@ -7,7 +7,7 @@ import { Breadcrumbs } from '@/components/common/breadcrumbs';
 import { InfoTip } from '@/components/common/info-tip';
 import type { ApiUser } from '@/types/api';
 import { addCohortMember, removeCohortMember } from '@/services/sections.api.service';
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ExternalLink, GraduationCap, Plus, UserPlus, Users } from "lucide-react";
 import { EmptyState } from "@/components/common/empty-state";
 import { SkeletonRows } from "@/components/common/loading-state";
@@ -94,7 +94,18 @@ export function StudentDetail({
 
 function StudentProgress({ id }: { id: string }) {
   const load = useCallback(() => getReadiness({}, id), [id]);
-  const { data, error, refresh } = useCommunityData(load);
+  const { data, error, refresh, loading } = useCommunityData(load);
+  const hasScrolled = useRef(false);
+  useEffect(() => {
+    if (loading || hasScrolled.current) return;
+    hasScrolled.current = true;
+    if (window.innerWidth >= 1536) return;
+    // Wait for the snapshot's final height so the page can scroll far enough.
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('student-detail')?.scrollIntoView({ block: 'start', behavior: 'auto' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [loading]);
   const base = window.location.pathname.startsWith('/teacher') ? '/teacher' : '/admin';
   if (error) return <div className="rounded-lg border p-3 text-sm"><p role="alert">{error}</p><button className="mt-2 text-primary underline" onClick={refresh}>Retry progress</button></div>;
   if (!data) return <SkeletonRows rows={2} />;
@@ -194,15 +205,12 @@ export function StudentsAdmin({
             {loading ? <SkeletonRows rows={4} /> : filteredStudents.length ? filteredStudents.slice(0, visibleCount).map((student) => (
               <button
                 key={student.id}
+                aria-pressed={selectedStudent?.id === student.id}
+                aria-controls="student-detail"
                 className={`group grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border p-3 text-left transition-colors sm:p-4 ${
                   selectedStudent?.id === student.id ? "border-primary/50 bg-primary/5 ring-1 ring-primary/15" : "bg-white hover:border-primary/30 hover:bg-slate-50"
                 }`}
-                onClick={() => {
-                  onSelectStudent(student.id);
-                  if (window.innerWidth < 1536) window.requestAnimationFrame(() => {
-                    document.getElementById('student-detail')?.scrollIntoView({ block: 'start', behavior: 'auto' });
-                  });
-                }}
+                onClick={() => onSelectStudent(student.id)}
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><GraduationCap className="h-5 w-5" /></span>

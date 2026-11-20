@@ -1,233 +1,13 @@
-import { isValidEmail } from '@/lib/utils';
 import { useEffect, useState } from "react";
-import { Building2, Check, LoaderCircle, Mail, MapPin, Phone, ShieldCheck, Users, X, type LucideIcon } from "lucide-react";
-import { ApiNotice, InfoTile } from "@/components/common/admin-primitives";
-import { DonutProgress } from "@/components/common/donut-progress";
+import { Building2, Check, LoaderCircle, Mail, MapPin, Phone, ShieldCheck, X, type LucideIcon } from "lucide-react";
+import { ApiNotice } from "@/components/common/admin-primitives";
 import { EmptyState } from "@/components/common/empty-state";
-import { FieldError } from "@/components/common/form-validation";
 import { SkeletonRows } from "@/components/common/loading-state";
 import { SectionIntro } from "@/components/common/section-intro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import type { AcceptedOrganization } from "@/types/api";
-import type { OrganizationRequest, OrganizationRow } from "@/types/super-admin";
-
-export function OrganizationsPage({
-  organizations,
-  apiOrganizations,
-  selectedOrg,
-  loadError,
-  loading,
-  onSelectOrg,
-  onUpdateDetails,
-  onUpdateStatus,
-  onRecoverCredentials,
-}: {
-  organizations: OrganizationRow[];
-  apiOrganizations: AcceptedOrganization[];
-  selectedOrg: OrganizationRow | null;
-  loadError: string;
-  loading: boolean;
-  onSelectOrg: (orgId: string) => void;
-  onUpdateDetails: (orgId: string, payload: Partial<AcceptedOrganization>) => Promise<void>;
-  onUpdateStatus: (orgId: string, status: string) => Promise<void>;
-  onRecoverCredentials: (registrationId: string) => Promise<void>;
-}) {
-  const selectedApiOrg = selectedOrg ? apiOrganizations.find((organization) => organization._id === selectedOrg.id) : undefined;
-  const [form, setForm] = useState({
-    orgName: selectedApiOrg?.orgName ?? selectedOrg?.name ?? "",
-    orgEmail: selectedApiOrg?.orgEmail ?? "",
-    phoneNumber: selectedApiOrg?.phoneNumber ?? "",
-    country: selectedApiOrg?.location?.country ?? "",
-    state: selectedApiOrg?.location?.state ?? "",
-    city: selectedApiOrg?.location?.city ?? "",
-    postalCode: selectedApiOrg?.location?.postalCode ?? "",
-    address: selectedApiOrg?.address ?? selectedOrg?.region ?? "",
-  });
-  const [savingDetails, setSavingDetails] = useState(false);
-  const [recovering, setRecovering] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    setForm({
-      orgName: selectedApiOrg?.orgName ?? selectedOrg?.name ?? "",
-      orgEmail: selectedApiOrg?.orgEmail ?? "",
-      phoneNumber: selectedApiOrg?.phoneNumber ?? "",
-      country: selectedApiOrg?.location?.country ?? "",
-      state: selectedApiOrg?.location?.state ?? "",
-      city: selectedApiOrg?.location?.city ?? "",
-      postalCode: selectedApiOrg?.location?.postalCode ?? "",
-      address: selectedApiOrg?.address ?? selectedOrg?.region ?? "",
-    });
-  }, [
-    selectedApiOrg?._id,
-    selectedApiOrg?.orgName,
-    selectedApiOrg?.orgEmail,
-    selectedApiOrg?.phoneNumber,
-    selectedApiOrg?.location?.country,
-    selectedApiOrg?.location?.state,
-    selectedApiOrg?.location?.city,
-    selectedApiOrg?.location?.postalCode,
-    selectedApiOrg?.address,
-    selectedOrg?.id,
-    selectedOrg?.name,
-    selectedOrg?.region,
-  ]);
-
-  async function submitDetails(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedOrg) return;
-    const nextErrors: Record<string, string> = {};
-    if (!form.orgName.trim()) nextErrors.orgName = "Organization name is required.";
-    if (!form.orgEmail.trim()) nextErrors.orgEmail = "Organization email is required.";
-    else if (!isValidEmail(form.orgEmail)) nextErrors.orgEmail = "Enter a valid email address.";
-    if (!form.phoneNumber.trim()) nextErrors.phoneNumber = "Phone number is required.";
-    if (!form.country.trim()) nextErrors.country = "Country is required.";
-    if (!form.state.trim()) nextErrors.state = "State is required.";
-    if (!form.city.trim()) nextErrors.city = "City is required.";
-    if (!form.postalCode.trim()) nextErrors.postalCode = "Postal code is required.";
-    if (!form.address.trim()) nextErrors.address = "Address is required.";
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length) return;
-    setSavingDetails(true);
-    try {
-      await onUpdateDetails(selectedOrg.id, {
-        orgName: form.orgName,
-        orgEmail: form.orgEmail,
-        phoneNumber: form.phoneNumber,
-        address: form.address,
-        location: {
-          country: form.country,
-          state: form.state,
-          city: form.city,
-          postalCode: form.postalCode,
-        },
-      });
-    } finally {
-      setSavingDetails(false);
-    }
-  }
-
-  async function submitStatus(status: string) {
-    if (!selectedOrg) return;
-    setUpdatingStatus(status);
-    try {
-      await onUpdateStatus(selectedOrg.id, status);
-    } finally {
-      setUpdatingStatus("");
-    }
-  }
-
-  return (
-    <>
-      <SectionIntro
-        eyebrow="Organizations"
-        title="Create, activate, suspend, and inspect tenant organizations."
-        description="Each organization has isolated users, students, coordinators, sections, subscriptions, and usage."
-      />
-      {loadError ? <ApiNotice message={loadError} /> : null}
-      <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_410px]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Organization Directory</CardTitle>
-            <CardDescription>Tenant status and subscription overview.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {loading ? <SkeletonRows rows={4} /> : organizations.map((org) => (
-              <button
-                key={org.id}
-                className={`grid w-full gap-3 rounded-lg border p-3 text-left md:grid-cols-[minmax(0,1fr)_120px] md:items-center ${
-                  selectedOrg?.id === org.id ? "border-primary bg-primary/5" : "bg-white"
-                }`}
-                onClick={() => onSelectOrg(org.id)}
-              >
-                <div className="min-w-0">
-                  <p className="font-semibold">{org.name}</p>
-                  <p className="text-sm text-muted-foreground">{org.students} students · {org.coordinators} coordinators · {org.region}</p>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">{org.plan}</p>
-                </div>
-                <Badge variant={org.status === "Active" ? "secondary" : org.status === "Suspended" ? "danger" : "warning"}>{org.status}</Badge>
-              </button>
-            ))}
-            {!loading && !organizations.length ? (
-              <EmptyState title="No organizations yet" description="Approved organizations will appear here after registration review." />
-            ) : null}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>{selectedOrg?.name ?? "No organization selected"}</CardTitle>
-            <CardDescription>Tenant controls and usage.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {selectedOrg ? (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <InfoTile label="Status" value={selectedOrg.status} />
-                  <InfoTile label="Students" value={String(selectedOrg.students)} />
-                  <InfoTile label="Coordinators" value={String(selectedOrg.coordinators)} />
-                  <InfoTile label="Region" value={selectedOrg.region || "Not provided"} />
-                </div>
-                <div className="rounded-lg border bg-background p-3">
-                  <p className="text-xs font-medium text-muted-foreground">Enabled Features</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {(selectedOrg.plan ? selectedOrg.plan.split(",").map((item) => item.trim()).filter(Boolean) : ["Custom"]).map((feature) => (
-                      <Badge key={feature} variant="outline">{feature}</Badge>
-                    ))}
-                  </div>
-                </div>
-                <DonutProgress value={selectedOrg.usage} label="Active accounts" caption="Accounts enabled for sign-in" />
-                {selectedApiOrg && !selectedApiOrg.credentialsSentAt && <Button variant="outline" disabled={recovering} onClick={async () => {
-                  setRecovering(true);
-                  try { await onRecoverCredentials(selectedApiOrg.registrationRequest); }
-                  finally { setRecovering(false); }
-                }}>{recovering ? 'Recovering…' : 'Recover undelivered admin credentials'}</Button>}
-              </>
-            ) : (
-              <EmptyState icon={Users} title="No organization selected" description="Select an organization after one is approved." />
-            )}
-            <form className="grid max-w-xl gap-2" onSubmit={submitDetails}>
-              <div className="space-y-1"><Input required placeholder="Organization name" value={form.orgName} onChange={(event) => setForm((current) => ({ ...current, orgName: event.target.value }))} /><FieldError message={errors.orgName} /></div>
-              <div className="space-y-1"><Input required type="email" placeholder="Organization email" value={form.orgEmail} onChange={(event) => setForm((current) => ({ ...current, orgEmail: event.target.value }))} /><FieldError message={errors.orgEmail} /></div>
-              <div className="space-y-1"><Input required placeholder="Phone number" value={form.phoneNumber} onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))} /><FieldError message={errors.phoneNumber} /></div>
-              <div className="space-y-1"><Input required placeholder="Country" value={form.country} onChange={(event) => setForm((current) => ({ ...current, country: event.target.value }))} /><FieldError message={errors.country} /></div>
-              <div className="space-y-1"><Input required placeholder="State" value={form.state} onChange={(event) => setForm((current) => ({ ...current, state: event.target.value }))} /><FieldError message={errors.state} /></div>
-              <div className="space-y-1"><Input required placeholder="City" value={form.city} onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))} /><FieldError message={errors.city} /></div>
-              <div className="space-y-1"><Input required placeholder="Postal code" value={form.postalCode} onChange={(event) => setForm((current) => ({ ...current, postalCode: event.target.value }))} /><FieldError message={errors.postalCode} /></div>
-              <div className="space-y-1">
-              <textarea
-                required
-                className="min-h-20 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
-                placeholder="Address"
-                value={form.address}
-                onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
-              />
-              <FieldError message={errors.address} />
-              </div>
-              <Button type="submit" variant="outline" disabled={!selectedOrg || savingDetails}>
-                {savingDetails ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-                {savingDetails ? "Updating..." : "Update Details"}
-              </Button>
-            </form>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Button variant="outline" disabled={!selectedOrg || Boolean(updatingStatus)} onClick={() => submitStatus("Active")}>
-                {updatingStatus === "Active" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-                Activate
-              </Button>
-              <Button variant="outline" disabled={!selectedOrg || Boolean(updatingStatus)} onClick={() => submitStatus("Suspended")}>
-                {updatingStatus === "Suspended" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-                Suspend
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-    </>
-  );
-}
+import type { OrganizationRequest } from "@/types/super-admin";
 
 export function RequestsPage({
   requests,
@@ -261,17 +41,17 @@ export function RequestsPage({
     <>
       <SectionIntro
         eyebrow="Organization Requests"
-        title="Review and approve new institution onboarding requests."
+        title="Organization requests"
         description="Approve valid institutions, reject incomplete requests, or mark them for review."
       />
       {loadError ? <ApiNotice message={loadError} /> : null}
-      <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <Card>
-          <CardHeader>
+      <section className="grid min-w-0 gap-4 lg:grid-cols-[minmax(260px,0.7fr)_minmax(0,1.6fr)]">
+        <Card className="flex min-h-0 flex-col lg:max-h-[calc(100dvh-15rem)]">
+          <CardHeader className="shrink-0">
             <CardTitle>Registration Queue</CardTitle>
             <CardDescription>Select a request to inspect full organization details.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="panel-scroll max-h-80 space-y-3 lg:max-h-none" tabIndex={0} aria-label="Registration requests">
             {loading ? <SkeletonRows rows={4} /> : requests.map((request) => (
               <button
                 key={request.id}
@@ -281,11 +61,11 @@ export function RequestsPage({
                 onClick={() => setSelectedRequestId(request.id)}
               >
                 <div className="min-w-0">
-                  <p className="font-semibold">{request.name}</p>
-                  <p className="text-sm text-muted-foreground">{request.contact} · {request.submitted}</p>
+                  <p className="break-words font-semibold">{request.name}</p>
+                  <p className="break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">{request.contact} · {request.submitted}</p>
                   <p className="mt-1 truncate text-xs text-muted-foreground">Requested: {request.requestedPlan || "Standard setup"}</p>
                 </div>
-                <Badge variant="outline">{request.status}</Badge>
+                <Badge variant="warning">{request.status}</Badge>
               </button>
             ))}
             {!loading && !requests.length ? (
@@ -293,12 +73,12 @@ export function RequestsPage({
             ) : null}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
+        <Card className="flex min-h-0 flex-col lg:max-h-[calc(100dvh-15rem)]">
+          <CardHeader className="shrink-0">
             <CardTitle>{selectedRequest?.name ?? "No request selected"}</CardTitle>
             <CardDescription>Review all submitted details before making a decision.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="panel-scroll space-y-4" tabIndex={0} aria-label="Registration details">
             {loading ? <SkeletonRows rows={5} /> : selectedRequest ? (
               <>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -315,7 +95,7 @@ export function RequestsPage({
                   <p className="text-xs font-medium text-muted-foreground">Requested Features</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {(selectedRequest.requestedPlan ? selectedRequest.requestedPlan.split(",").map((item) => item.trim()).filter(Boolean) : ["Standard setup"]).map((feature) => (
-                      <Badge key={feature} variant="outline">{feature}</Badge>
+                      <Badge key={feature} variant="feature">{feature}</Badge>
                     ))}
                   </div>
                 </div>
@@ -326,7 +106,7 @@ export function RequestsPage({
                   </div>
                 ) : null}
                 <div className="flex flex-wrap justify-end gap-2">
-                  <Button variant="outline" disabled={Boolean(busyRequest)} onClick={() => handleRequestAction(selectedRequest.id, "Rejected")}>
+                  <Button variant="destructive" disabled={Boolean(busyRequest)} onClick={() => handleRequestAction(selectedRequest.id, "Rejected")}>
                     {busyRequest === `${selectedRequest.id}:Rejected` ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
                     {busyRequest === `${selectedRequest.id}:Rejected` ? "Rejecting..." : "Reject"}
                   </Button>

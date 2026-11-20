@@ -166,7 +166,7 @@ export function UsersPage({
                 </select>
               )}
               <Badge variant={user.status === "active" ? "secondary" : "warning"}>{user.status}</Badge>
-              <Button size="sm" variant="outline" disabled={!hasApiUsers || user.role === "superadmin" || Boolean(updatingUserId)} onClick={() => toggleUserStatus(user as ApiUser)}>
+              <Button size="sm" variant={user.status === 'active' ? 'destructive' : 'default'} disabled={!hasApiUsers || user.role === "superadmin" || Boolean(updatingUserId)} onClick={() => toggleUserStatus(user as ApiUser)}>
                 {updatingUserId === user.id ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
                 {updatingUserId === user.id ? "Updating..." : user.status === "active" ? "Deactivate" : "Activate"}
               </Button>
