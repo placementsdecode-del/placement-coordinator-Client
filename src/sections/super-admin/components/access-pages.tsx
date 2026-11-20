@@ -108,13 +108,13 @@ export function UsersPage({
         title="Users"
         description="Monitor organization admins, coordinators, and account status across tenants."
       />
-      <Card>
+      <Card className="workspace-form-panel">
         <CardHeader>
           <CardTitle>Create user</CardTitle>
           <CardDescription>Choose an organization and a role for the account.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid max-w-5xl gap-4 sm:grid-cols-2 xl:grid-cols-3" onSubmit={createUser}>
+          <form className="grid gap-4 sm:grid-cols-2" onSubmit={createUser}>
             <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Name</span><Input required placeholder="Name" value={name} onChange={(event) => setName(event.target.value)} /><FieldError message={errors.name} /></label>
             <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Email address</span><Input required type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} /><FieldError message={errors.email} /></label>
             <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Organization</span>
@@ -134,7 +134,7 @@ export function UsersPage({
               <FieldError message={errors.roleName} />
             </label>
             <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Password (optional)</span><Input type="password" autoComplete="new-password" placeholder="Optional" value={password} onChange={(event) => setPassword(event.target.value)} /><FieldError message={errors.password} /></label>
-            <div className="flex justify-end sm:col-span-2 xl:col-span-3">
+            <div className="flex sm:col-span-2">
               <Button type="submit" disabled={creating}>
                 {creating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 {creating ? "Creating..." : "Create User"}
@@ -240,13 +240,13 @@ export function FeaturesPage({
         title="Features"
         description="Create features and control default enablement for new organization requests."
       />
-      <Card>
+      <Card className="workspace-form-panel">
         <CardHeader>
           <CardTitle>Create feature</CardTitle>
           <CardDescription>Feature keys should be stable API identifiers.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid max-w-5xl gap-4 sm:grid-cols-2" onSubmit={createFeature}>
+          <form className="grid gap-4 sm:grid-cols-2" onSubmit={createFeature}>
             <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Feature key</span><Input required placeholder="feature-key" value={form.key} onChange={(event) => setForm((current) => ({ ...current, key: event.target.value }))} /><FieldError message={errors.key} /></label>
             <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Feature name</span><Input required placeholder="Feature name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /><FieldError message={errors.name} /></label>
             <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Description</span><Input required placeholder="Description" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} /><FieldError message={errors.description} /></label>
@@ -259,7 +259,7 @@ export function FeaturesPage({
               />
               Default
             </label>
-            <div className="flex justify-end sm:col-span-2">
+            <div className="flex sm:col-span-2">
               <Button type="submit" disabled={creating}>
                 {creating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 {creating ? "Creating..." : "Create Feature"}
@@ -374,7 +374,7 @@ export function RolesSettingsPage({
           <CardDescription>Choose the tenant whose roles you want to manage.</CardDescription>
         </CardHeader>
         <CardContent>
-          <select aria-label="Filter roles by organization" className="compact-select max-w-md" value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}>
+          <select aria-label="Filter roles by organization" className="compact-select" value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}>
             <option value="">All roles</option>
             {organizations.map((organization) => <option key={organization._id} value={organization._id}>{organization.orgName}</option>)}
           </select>

@@ -48,7 +48,7 @@ export function GroupRoom({ group, onBack }: { group: StudentGroup; onBack: () =
     finally { setLoadingOlder(false); }
   }
 
-  return <div className="space-y-4">
+  return <div className="workspace-form-panel space-y-4">
     <Breadcrumbs items={[{ label: group.kind === 'practice' ? 'Self-Assessment' : 'Groups', onClick: onBack }, { label: group.name }]} />
     <Card><CardHeader><CardTitle>{group.name}</CardTitle><ExpandableText text={group.description} label="description" /></CardHeader><CardContent>
       <details><summary className="cursor-pointer text-sm font-medium">Participants ({group.participants.filter(member => member.status === 'accepted').length}) · Coordinators ({group.coordinators?.length || 0})</summary>
@@ -72,7 +72,7 @@ export function GroupRoom({ group, onBack }: { group: StudentGroup; onBack: () =
         catch (reason) { setActionError(reason instanceof Error ? reason.message : 'Message could not be sent'); }
         finally { setPending(false); }
       }}>
-        <label className="block text-sm font-medium">Message<textarea required maxLength={5000} className="workspace-textarea mt-2 min-h-24" value={text} disabled={pending} onChange={event => setText(event.target.value)} /></label>
+        <label className="block text-sm font-medium">Message<textarea required maxLength={5000} className="workspace-textarea mt-1" value={text} disabled={pending} onChange={event => setText(event.target.value)} /></label>
         <Button disabled={pending || !text.trim()}>{pending ? 'Sending…' : 'Send message'}</Button>
         {actionError && <p role="alert" className="text-sm text-destructive">{actionError}</p>}
       </form>

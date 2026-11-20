@@ -27,6 +27,10 @@ const student = {
   id: 'student-1', registrationNumber: 'CSE001', name: 'Sanvi Rao', email: 'student-with-an-unusually-long-account-name@example.test',
   role: 'student', status: 'active', organization, section: cohort, department: 'CSE', batch: '2026',
 };
+const otherStudents = [
+  { ...student, id: 'student-2', name: 'Ira Shah', registrationNumber: 'CSE002', email: 'ira@example.test' },
+  { ...student, id: 'student-3', name: 'Aman Roy', registrationNumber: 'CSE003', email: 'aman@example.test' },
+];
 const assessment = {
   _id: 'assessment-1', title: 'Coding fundamentals', status: 'active', category: 'Coding',
   assignedSections: [cohort], durationMinutes: 30, totalMarks: 10, passingMarks: 5, questions: [],
@@ -62,7 +66,7 @@ async function mockWorkspace(page, workspace, errors) {
       '/api/auth/me': { user: { id: workspace, role: workspace === 'admin' ? 'admin' : 'superadmin', name: 'Test operator', organization: organization._id } },
       '/api/organizations': { organizations: rows(organization) },
       '/api/org-registrations': { registrations: rows(pending) },
-      '/api/users': { users: rows(student, teacher) },
+      '/api/users': { users: rows(student, ...otherStudents, teacher) },
       '/api/roles': { roles: rows(role) },
       '/api/roles/permissions': { permissions: ['assessment.manage', 'user.manage'] },
       '/api/features': { features: rows(feature) },
@@ -98,7 +102,15 @@ async function checkLayout(page, route, width) {
     const header = document.querySelector('.management-workspace header');
     const sidebar = document.querySelector('#workspace-sidebar');
     const selectSizes = [...main.querySelectorAll('select.compact-select')].filter(node => node.checkVisibility()).map(node => ({ name: node.getAttribute('aria-label') ?? node.parentElement.querySelector('label')?.textContent, height: Math.round(node.getBoundingClientRect().height), css: getComputedStyle(node).height }));
+    const oversizedFields = [...main.querySelectorAll('select, textarea, input')].flatMap(node => {
+      const limit = node.tagName === 'SELECT' ? 288 : node.tagName === 'TEXTAREA' ? 672 : {
+        text: 352, search: 352, email: 352, tel: 352, password: 352, url: 352, file: 352, number: 192, date: 192,
+      }[node.type];
+      const width = node.getBoundingClientRect().width;
+      return limit && width > limit + 1 ? [{ label: node.getAttribute('aria-label') ?? node.placeholder ?? node.tagName, width, limit }] : [];
+    });
     return {
+      oversizedFields,
       viewport: innerWidth, documentWidth: document.documentElement.scrollWidth,
       flowWidth: main.scrollWidth, mainWidth: main.clientWidth,
       headerHeight: header.getBoundingClientRect().height, headerLeft: header.getBoundingClientRect().left,
@@ -107,10 +119,54 @@ async function checkLayout(page, route, width) {
   });
   assert.ok(layout.documentWidth <= layout.viewport, `${route} overflows viewport at ${width}px`);
   assert.ok(layout.flowWidth <= layout.mainWidth + 1, `${route} overflows content at ${width}px: ${layout.flowWidth} > ${layout.mainWidth}`);
+  assert.deepEqual(layout.oversizedFields, [], `${route} control widths at ${width}px`);
   assert.equal(layout.headerHeight, 64, `${route} header height`);
   assert.equal(layout.headerLeft, width >= 1024 ? 256 : 0, `${route} header alignment`);
   assert.equal(layout.sidebarWidth, 256, `${route} sidebar width`);
   assert.ok(layout.selectSizes.every(size => size.height === (width >= 640 ? 40 : 44)), `${route} select sizing at ${width}px: ${JSON.stringify(layout.selectSizes)}`);
+}
+
+async function fieldRect(field, maxWidth) {
+  await field.waitFor();
+  const bounds = await field.boundingBox();
+  assert.ok(bounds && bounds.width <= maxWidth + 1, `${await field.getAttribute('aria-label') || 'Field'} is ${bounds?.width}px wide, expected ≤${maxWidth}px`);
+  return bounds;
+}
+
+async function checkCompactAdminForms(page) {
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await page.goto(base + '/admin/tasks');
+  const title = await fieldRect(page.getByRole('textbox', { name: 'Title', exact: true }), 352);
+  const type = await fieldRect(page.getByRole('combobox', { name: 'Type', exact: true }), 208);
+  assert.ok(Math.abs(title.y - type.y) < 1, 'Title and type should share a row on desktop');
+  await fieldRect(page.getByRole('textbox', { name: 'Instructions' }), 672);
+  const taskPanel = await page.getByRole('textbox', { name: 'Title', exact: true }).locator('xpath=ancestor::form').boundingBox();
+  assert.ok(taskPanel.width <= 736, 'Task form should be narrower than the page');
+
+  await page.goto(base + '/admin/students');
+  await fieldRect(page.getByRole('textbox', { name: 'Search students' }), 352);
+  await page.getByText('Bulk upload students', { exact: true }).click();
+  await fieldRect(page.getByRole('combobox', { name: 'Import cohort' }), 224);
+  const cards = page.getByRole('group', { name: 'Student cards' }).getByRole('button');
+  await cards.nth(2).waitFor();
+  const first = await cards.first().boundingBox();
+  const second = await cards.nth(1).boundingBox();
+  assert.ok(first.width <= 384 && second.width <= 384, 'Student cards should stay compact on desktop');
+  assert.ok(first.x < second.x && Math.abs(first.y - second.y) < 1, 'Student cards should sit side by side on desktop');
+  await checkLayout(page, '/admin/students bulk upload', 390);
+  const firstMobile = await cards.first().boundingBox();
+  const secondMobile = await cards.nth(1).boundingBox();
+  assert.ok(firstMobile.x === secondMobile.x && secondMobile.y > firstMobile.y, 'Student cards should stack on phones');
+
+  await page.goto(base + '/admin/groups');
+  await page.getByRole('button', { name: 'Create / invite' }).click();
+  await checkLayout(page, '/admin/groups create', 1920);
+  const group = await fieldRect(page.getByRole('combobox', { name: 'Group', exact: true }), 288);
+  const name = await fieldRect(page.getByRole('textbox', { name: 'Group name' }), 352);
+  assert.ok(Math.abs(group.y - name.y) < 1, 'Group selector and name should share a row on desktop');
+  await fieldRect(page.getByRole('textbox', { name: 'Search students to invite' }), 352);
+  await page.getByRole('button', { name: /Interview practice group/ }).click();
+  await fieldRect(page.getByRole('textbox', { name: 'Message', exact: true }), 672);
 }
 
 (async () => {
@@ -158,6 +214,8 @@ async function checkLayout(page, route, width) {
       assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
 
       if (workspace === 'admin') {
+        await checkCompactAdminForms(page);
+        await page.setViewportSize({ width: 390, height: 900 });
         await page.goto(base + '/admin/students');
         await page.getByRole('button', { name: /Sanvi Rao/ }).click();
         await page.getByRole('region', { name: 'Preparation snapshot' }).waitFor();

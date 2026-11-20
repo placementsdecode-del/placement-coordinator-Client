@@ -40,7 +40,7 @@ export function ChangePasswordCard({ mustChangePassword = false }: { mustChangeP
   }
 
   return (
-    <Card>
+    <Card className="max-w-md">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <LockKeyhole className="h-5 w-5 text-primary" />
@@ -57,7 +57,7 @@ export function ChangePasswordCard({ mustChangePassword = false }: { mustChangeP
           <Input required aria-label="Confirm new password" autoComplete="new-password" minLength={8} type="password" placeholder="Confirm new password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
           {error ? <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</p> : null}
           {message ? <p className="rounded-md border border-primary/25 bg-primary/10 p-3 text-sm font-medium text-primary">{message}</p> : null}
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" className="justify-self-start" disabled={isSubmitting}>
             {isSubmitting ? "Updating..." : "Update Password"}
           </Button>
         </form>

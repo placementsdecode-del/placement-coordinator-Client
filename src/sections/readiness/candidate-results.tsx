@@ -67,7 +67,7 @@ export function CandidateResults({ rows, policy, onSelect }: {
         </tr>)}</tbody>
       </table>
     </div>
-    <ul className="grid gap-3 md:grid-cols-2 xl:hidden">
+    <ul className="workspace-card-grid xl:hidden">
       {rows.map(row => <li key={row.student.id} className="min-w-0 space-y-3 rounded-xl border bg-card p-4">
         <StudentIdentity student={row.student} />
         <p className="break-words text-xs text-muted-foreground">{[row.student.department, row.student.batch].filter(Boolean).join(' · ') || 'Department and batch unavailable'}</p>

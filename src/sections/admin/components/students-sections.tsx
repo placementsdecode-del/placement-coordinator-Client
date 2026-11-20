@@ -32,7 +32,7 @@ export function StudentDetail({
   const [error, setError] = useState("");
 
   return (
-    <Card id="student-detail" className="scroll-mt-24 self-start 2xl:sticky 2xl:top-24">
+    <Card id="student-detail" className="w-full max-w-sm scroll-mt-24 self-start 2xl:sticky 2xl:top-24">
       <CardHeader>
         <CardTitle>Student Detail</CardTitle>
         <CardDescription>Contact details and a preparation snapshot.</CardDescription>
@@ -182,41 +182,38 @@ export function StudentsAdmin({
       {showCreate ? <CreateStudentForm sections={sections} onCreateStudent={onCreateStudent} /> : null}
       <section className="grid min-w-0 items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card>
-          <CardHeader className="flex-wrap gap-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-            <div>
-              <CardTitle>Student directory</CardTitle>
-              <CardDescription>{filteredStudents.length} {filteredStudents.length === 1 ? 'student' : 'students'}{sectionFilter !== 'all' ? ' in this cohort' : ' in your directory'}.</CardDescription>
-            </div>
-            <select
-              className="compact-select sm:w-56"
-              aria-label="Filter by cohort"
-              value={sectionFilter}
-              onChange={(event) => { setSectionFilter(event.target.value); setVisibleCount(50); }}
-            >
-              <option value="all">All students</option>
-              <option value="unassigned">Unassigned</option>
-              {sections.map((section) => (
-                <option key={section.id} value={section.id}>{section.name} · {section.code}</option>
-              ))}
-            </select>
+          <CardHeader>
+            <CardTitle>Student directory</CardTitle>
+            <CardDescription>{filteredStudents.length} {filteredStudents.length === 1 ? 'student' : 'students'}{sectionFilter !== 'all' ? ' in this cohort' : ' in your directory'}.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Input aria-label="Search students" placeholder="Search name, email or registration number" value={search} onChange={(event) => { setSearch(event.target.value); setVisibleCount(50); }} />
-            {loading ? <SkeletonRows rows={4} /> : filteredStudents.length ? filteredStudents.slice(0, visibleCount).map((student) => (
-              <button
-                key={student.id}
-                aria-pressed={selectedStudent?.id === student.id}
-                aria-controls="student-detail"
-                className="workspace-directory-item grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3"
-                onClick={() => onSelectStudent(student.id)}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><GraduationCap className="h-5 w-5" /></span>
-                  <span className="min-w-0"><span className="block truncate font-semibold">{student.name}</span><span className="block truncate text-sm text-muted-foreground">{student.rollNo} · {student.email}</span><span className="mt-1 block truncate text-xs text-muted-foreground">{student.section}</span></span>
-                </div>
-                <Badge variant={student.status === 'Active' ? 'secondary' : 'muted'}>{student.status}</Badge>
-              </button>
-            )) : (
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,22rem)_minmax(0,13rem)]" role="group" aria-label="Student filters">
+              <Input aria-label="Search students" placeholder="Search name, email or registration number" value={search} onChange={event => { setSearch(event.target.value); setVisibleCount(50); }} />
+              <select className="compact-select" aria-label="Filter by cohort" value={sectionFilter} onChange={event => { setSectionFilter(event.target.value); setVisibleCount(50); }}>
+                <option value="all">All students</option>
+                <option value="unassigned">Unassigned</option>
+                {sections.map(section => <option key={section.id} value={section.id}>{section.name} · {section.code}</option>)}
+              </select>
+            </div>
+            {loading ? <SkeletonRows rows={4} /> : filteredStudents.length ? (
+              <div className="workspace-card-grid" role="group" aria-label="Student cards">
+                {filteredStudents.slice(0, visibleCount).map(student => (
+                  <button key={student.id} type="button" aria-pressed={selectedStudent?.id === student.id} aria-controls="student-detail"
+                    className="workspace-directory-item grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2"
+                    onClick={() => onSelectStudent(student.id)}>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"><GraduationCap className="size-4" /></span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold" title={student.name}>{student.name}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{student.rollNo} · {student.section}</span>
+                      </span>
+                    </span>
+                    <Badge variant={student.status === 'Active' ? 'secondary' : 'muted'}>{student.status}</Badge>
+                    <span className="col-span-2 mt-1 block truncate text-xs text-muted-foreground" title={student.email}>{student.email}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
               <EmptyState icon={Users} title={students.length ? "No matching students" : "No students yet"} description={students.length ? "Try a different search or section filter." : "Add your first student and assign a section when ready."} />
             )}
             {filteredStudents.length > visibleCount && <Button variant="outline" onClick={() => setVisibleCount(count => count + 50)}>Show more students</Button>}
@@ -251,8 +248,8 @@ export function SectionsAdmin({ sections, students, onCreateSection, onUpdateSec
       <Card><CardHeader><CardTitle>Coordinators <InfoTip text="Select faculty to monitor this cohort. Assigned coordinators can see its students, publish assessments, and review progress." /></CardTitle><CardDescription>{cohort.description}</CardDescription></CardHeader><CardContent className="space-y-3"><p>{cohort.coordinator}</p>{canManage && <ResourcePanel resource={facultyStatus} label="Coordinators"><div className="grid gap-2 sm:grid-cols-3">{faculty.map(t => { const id = t.id || t._id || ''; const assigned = assignments[cohort.id] || []; return <label key={id} className="flex gap-2 rounded-lg border p-3 text-sm"><input type="checkbox" checked={assigned.includes(id)} disabled={pending} onChange={e => void run(() => onAssignCoordinators(cohort.id, e.target.checked ? [...assigned, id] : assigned.filter(a => a !== id)))} />{t.name}</label>; })}{!faculty.length && <p>Create a faculty account in Coordinators first.</p>}</div></ResourcePanel>}</CardContent></Card>
       <div className="flex flex-wrap gap-2">{canManage && <Button variant="outline" onClick={() => setEditing(v => !v)}>Edit cohort</Button>}<Button variant="outline" onClick={() => setAdding(v => !v)}>Add participants</Button></div>
       {editing && <CreateSectionForm initialSection={cohort} onCreateSection={async s => { await onUpdateSection(s); setEditing(false); }} />}
-      {adding && <ResourcePanel resource={studentsStatus} label="Available students"><Card><CardContent className="space-y-4 p-5"><form className="flex flex-wrap gap-2" onSubmit={e => { e.preventDefault(); void run(async () => { await addCohortMember(cohort.id, assignId); await onRefresh(); setAssignId(''); }); }}><select aria-label="Student to add" className="compact-select flex-1" value={assignId} onChange={e => setAssignId(e.target.value)}><option value="">Select a student</option>{students.filter(s => !belongs(s)).map(s => <option key={s.id} value={s.id}>{s.name} · {s.rollNo}</option>)}</select><Button disabled={pending || !assignId}>Add to cohort</Button><InfoTip text="Students can join multiple cohorts. Adding a student here keeps their existing memberships." /></form>{canManage && <CreateStudentForm sections={sections} initialSectionId={cohort.id} embedded onCreateStudent={onCreateStudent} />}</CardContent></Card></ResourcePanel>}
-      <ResourcePanel resource={studentsStatus} label="Participants"><h2 className="font-semibold">Participants ({members.length})</h2><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{members.map(s => <Card key={s.id}><CardContent className="p-4"><button className="w-full text-left" onClick={() => setStudentId(s.id)}><p className="font-semibold">{s.name}</p><p className="text-sm text-muted-foreground">{s.rollNo}</p></button><Button variant="ghost" disabled={pending} className="mt-2" onClick={() => void run(async () => { await removeCohortMember(cohort.id, s.id); await onRefresh(); })}>Remove from cohort</Button></CardContent></Card>)}</div>{!members.length && <p className="text-muted-foreground">No participants yet. Add students to this cohort.</p>}</ResourcePanel>
-    </> : sections.length ? <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{sections.map(s => <button key={s.id} onClick={() => setOpened(s.id)} className="rounded-xl border bg-white p-5 text-left hover:border-primary"><h2 className="font-semibold">{s.name}</h2><p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{s.description}</p><p className="mt-3 text-sm">{studentsStatus.initialized ? students.filter(u => u.sectionId === s.id || u.cohortIds?.includes(s.id)).length : "…"} participants · {s.status}</p><p className="mt-1 text-xs text-muted-foreground">{s.coordinator}</p></button>)}</div> : <EmptyState title="No cohorts yet" description="Created cohorts will appear here with their participants and coordinators." />}
+      {adding && <ResourcePanel resource={studentsStatus} label="Available students"><Card className="workspace-form-panel"><CardContent className="space-y-4 p-5"><form className="flex flex-wrap items-center gap-2" onSubmit={e => { e.preventDefault(); void run(async () => { await addCohortMember(cohort.id, assignId); await onRefresh(); setAssignId(''); }); }}><select aria-label="Student to add" className="compact-select sm:basis-60" value={assignId} onChange={e => setAssignId(e.target.value)}><option value="">Select a student</option>{students.filter(s => !belongs(s)).map(s => <option key={s.id} value={s.id}>{s.name} · {s.rollNo}</option>)}</select><Button disabled={pending || !assignId}>Add to cohort</Button><InfoTip text="Students can join multiple cohorts. Adding a student here keeps their existing memberships." /></form>{canManage && <CreateStudentForm sections={sections} initialSectionId={cohort.id} embedded onCreateStudent={onCreateStudent} />}</CardContent></Card></ResourcePanel>}
+      <ResourcePanel resource={studentsStatus} label="Participants"><h2 className="font-semibold">Participants ({members.length})</h2><div className="workspace-card-grid">{members.map(s => <Card key={s.id}><CardContent className="p-4"><button className="w-full text-left" onClick={() => setStudentId(s.id)}><p className="font-semibold">{s.name}</p><p className="text-sm text-muted-foreground">{s.rollNo}</p></button><Button variant="ghost" disabled={pending} className="mt-2" onClick={() => void run(async () => { await removeCohortMember(cohort.id, s.id); await onRefresh(); })}>Remove from cohort</Button></CardContent></Card>)}</div>{!members.length && <p className="text-muted-foreground">No participants yet. Add students to this cohort.</p>}</ResourcePanel>
+    </> : sections.length ? <div className="workspace-card-grid">{sections.map(s => <button key={s.id} onClick={() => setOpened(s.id)} className="rounded-xl border bg-white p-5 text-left hover:border-primary"><h2 className="font-semibold">{s.name}</h2><p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{s.description}</p><p className="mt-3 text-sm">{studentsStatus.initialized ? students.filter(u => u.sectionId === s.id || u.cohortIds?.includes(s.id)).length : "…"} participants · {s.status}</p><p className="mt-1 text-xs text-muted-foreground">{s.coordinator}</p></button>)}</div> : <EmptyState title="No cohorts yet" description="Created cohorts will appear here with their participants and coordinators." />}
   </>;
 }

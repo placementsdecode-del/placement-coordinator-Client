@@ -52,7 +52,7 @@ export function CreateStudentForm({
 
   const formContent = (
     <form
-          className="grid max-w-5xl gap-3 md:grid-cols-4"
+          className="grid gap-3 sm:grid-cols-2"
           onSubmit={async (event) => {
             event.preventDefault();
             const nextErrors: Record<string, string> = {};
@@ -113,18 +113,20 @@ export function CreateStudentForm({
             </label>
             <FieldError message={errors.batch} />
           </div>
+          <label className="block min-w-0 space-y-1 text-sm font-medium">Primary cohort
           <select aria-label="Primary cohort" className="compact-select" value={form.section} onChange={(event) => setForm((current) => ({ ...current, section: event.target.value }))}>
             <option value="">No section</option>
             {sections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
           </select>
+          </label>
           <div className="space-y-1">
             <label className="block space-y-1 text-sm font-medium">Password optional
             <Input type="password" placeholder="Password optional" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} />
             </label>
             <FieldError message={errors.password} />
           </div>
-          <div className="md:col-span-4"><FieldError message={errors.submit} /></div>
-          <div className="flex justify-end md:col-span-4">
+          <div className="sm:col-span-2"><FieldError message={errors.submit} /></div>
+          <div className="flex sm:col-span-2">
             <Button type="submit" disabled={submitting}>
               {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
               {submitting ? "Creating..." : "Create Student"}
@@ -146,7 +148,7 @@ export function CreateStudentForm({
   }
 
   return (
-    <Card>
+    <Card className="workspace-form-panel">
       <CardHeader>
         <CardTitle>Add Student</CardTitle>
         <CardDescription>Create a student account and assign an initial section.</CardDescription>
@@ -170,14 +172,14 @@ export function CreateSectionForm({ onCreateSection, initialSection }: { onCreat
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   return (
-    <Card>
+    <Card className="workspace-form-panel">
       <CardHeader>
         <CardTitle>{initialSection ? "Edit section" : "Create section"}</CardTitle>
         <CardDescription>Define department, batch, academic year, code, and coordinator ownership.</CardDescription>
       </CardHeader>
       <CardContent>
         <form
-          className="grid max-w-5xl gap-3 md:grid-cols-4"
+          className="grid gap-3 sm:grid-cols-2"
           onSubmit={async (event) => {
             event.preventDefault();
             const sectionName = name.trim();
@@ -245,11 +247,11 @@ export function CreateSectionForm({ onCreateSection, initialSection }: { onCreat
               <option>Active</option><option>Inactive</option>
             </select>
           </label>
-          <label className="space-y-1 text-sm font-medium md:col-span-2">Description
+          <label className="space-y-1 text-sm font-medium sm:col-span-2">Description
             <Input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What is this section for?" />
           </label>
-          <div className="md:col-span-4"><FieldError message={errors.submit} /></div>
-          <div className="flex justify-end md:col-span-4">
+          <div className="sm:col-span-2"><FieldError message={errors.submit} /></div>
+          <div className="flex sm:col-span-2">
             <Button type="submit" disabled={submitting}>
               {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               {submitting ? "Saving..." : initialSection ? "Save changes" : "Create section"}

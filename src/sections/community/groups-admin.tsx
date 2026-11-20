@@ -23,19 +23,46 @@ export function GroupsAdmin({ students, faculty, studentsStatus, facultyStatus }
   if (!data && loading) return <PageSkeleton label="Loading groups" />;
   if (error) return <LoadError message={error} onRetry={refresh} />;
   const room = data?.groups.find(g => g._id === opened);
-  if (room) return <><GroupRoom key={room._id} group={room} onBack={() => setOpened('')} /><details className="rounded-lg border bg-white p-4"><summary className="cursor-pointer font-semibold">Manage coordinators</summary><ResourcePanel resource={facultyStatus} label="Group coordinators"><div className="mt-3 grid gap-2 sm:grid-cols-3">{faculty.map(t => { const id = t.id || t._id || ''; const ids = room.coordinators?.map(c => c._id) || []; return <label key={id} className="flex gap-2 p-2 text-sm"><input type="checkbox" disabled={pending} checked={ids.includes(id)} onChange={async e => { setPending(true); setActionError(''); try { await assignGroupCoordinators(room._id, e.target.checked ? [...ids, id] : ids.filter(i => i !== id)); refresh(); } catch (e) { setActionError(e instanceof Error ? e.message : 'Unable to assign coordinator'); } finally { setPending(false); } }} />{t.name}</label>; })}</div></ResourcePanel>{actionError && <p role="alert">{actionError}</p>}</details></>;
+  if (room) return <><GroupRoom key={room._id} group={room} onBack={() => setOpened('')} /><details className="workspace-form-panel rounded-lg border bg-card p-4"><summary className="cursor-pointer font-semibold">Manage coordinators</summary><ResourcePanel resource={facultyStatus} label="Group coordinators"><div className="mt-3 grid gap-2 sm:grid-cols-3">{faculty.map(t => { const id = t.id || t._id || ''; const ids = room.coordinators?.map(c => c._id) || []; return <label key={id} className="flex gap-2 p-2 text-sm"><input type="checkbox" disabled={pending} checked={ids.includes(id)} onChange={async e => { setPending(true); setActionError(''); try { await assignGroupCoordinators(room._id, e.target.checked ? [...ids, id] : ids.filter(i => i !== id)); refresh(); } catch (e) { setActionError(e instanceof Error ? e.message : 'Unable to assign coordinator'); } finally { setPending(false); } }} />{t.name}</label>; })}</div></ResourcePanel>{actionError && <p role="alert">{actionError}</p>}</details></>;
   return <><SectionIntro eyebrow="Student community" title="Groups" action={<Button onClick={() => setCreating(v => !v)}>{creating ? "Close" : "Create / invite"}</Button>} description="Create a group and invite students. Membership begins only after each student accepts in the app." />
-    {creating && <Card><CardHeader><CardTitle>{target ? `Invite to ${group?.name}` : 'Create a group'}</CardTitle><CardDescription>Students receive in-app invitations. No email links are sent.</CardDescription></CardHeader><CardContent>
+    {creating && <Card className="workspace-form-panel"><CardHeader><CardTitle>{target ? `Invite to ${group?.name}` : 'Create a group'}</CardTitle><CardDescription>Students receive in-app invitations. No email links are sent.</CardDescription></CardHeader><CardContent>
       <form className="space-y-4" onSubmit={async event => { event.preventDefault(); setPending(true); setActionError(''); setMessage(''); try { const response = target ? await inviteToGroup(target, selected) : await createGroup({ name, description, students: selected }); setMessage(response.message); setSelected([]); if (!target) { setName(''); setDescription(''); } refresh(); } catch (error) { setActionError(error instanceof Error ? error.message : 'Unable to send invitations.'); } finally { setPending(false); } }}>
-        <fieldset disabled={pending} className="space-y-4"><label className="block text-sm font-medium">Group<select aria-label="Group" className="compact-select mt-1" value={target} onChange={event => { setTarget(event.target.value); setSelected([]); }}><option value="">Create a new group</option>{data?.groups.map(group => <option key={group._id} value={group._id}>{group.name}</option>)}</select></label>
-        {!target && <><label className="block text-sm font-medium">Group name<Input required maxLength={120} value={name} onChange={event => setName(event.target.value)} /></label><label className="block text-sm font-medium">Description<Input maxLength={2000} value={description} onChange={event => setDescription(event.target.value)} /></label></>}
-        <Input aria-label="Search students to invite" placeholder="Search name or registration number" value={search} onChange={event => setSearch(event.target.value)} />
-        <ResourcePanel resource={studentsStatus} label="Students to invite"><fieldset className="max-h-64 overflow-y-auto rounded-lg border p-3"><legend className="px-2 text-sm font-semibold">Invite students ({selected.length} selected)</legend>{eligible.filter(student => `${student.name} ${student.rollNo}`.toLowerCase().includes(search.toLowerCase())).map(student => <label key={student.id} className="flex items-center gap-3 p-2 text-sm"><input type="checkbox" checked={selected.includes(student.id)} onChange={event => setSelected(ids => event.target.checked ? [...ids, student.id] : ids.filter(id => id !== student.id))} /><span>{student.name} · {student.rollNo} · {student.section}</span></label>)}{!eligible.length && <p className="text-sm text-muted-foreground">No additional eligible students. Existing invitations and memberships are listed below.</p>}</fieldset></ResourcePanel>
+        <fieldset disabled={pending} className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,18rem)_minmax(0,22rem)]">
+            <label className="block min-w-0 space-y-1 text-sm font-medium">
+              <span>Group</span>
+              <select aria-label="Group" className="compact-select" value={target} onChange={event => { setTarget(event.target.value); setSelected([]); }}>
+                <option value="">Create a new group</option>
+                {data?.groups.map(group => <option key={group._id} value={group._id}>{group.name}</option>)}
+              </select>
+            </label>
+            {!target && <label className="block min-w-0 space-y-1 text-sm font-medium">
+              <span>Group name</span>
+              <Input required maxLength={120} value={name} onChange={event => setName(event.target.value)} />
+            </label>}
+          </div>
+          {!target && <label className="block space-y-1 text-sm font-medium">
+            <span>Description</span>
+            <textarea className="workspace-textarea min-h-16" rows={2} maxLength={2000} value={description} onChange={event => setDescription(event.target.value)} />
+          </label>}
+          <Input aria-label="Search students to invite" placeholder="Search name or registration number" value={search} onChange={event => setSearch(event.target.value)} />
+          <ResourcePanel resource={studentsStatus} label="Students to invite">
+            <fieldset className="max-h-64 max-w-2xl overflow-y-auto rounded-lg border p-3">
+              <legend className="px-2 text-sm font-semibold">Invite students ({selected.length} selected)</legend>
+              <div className="grid gap-1 sm:grid-cols-2">
+                {eligible.filter(student => `${student.name} ${student.rollNo}`.toLowerCase().includes(search.toLowerCase())).map(student => <label key={student.id} className="flex min-w-0 items-start gap-2 rounded-md p-2 text-sm hover:bg-muted">
+                  <input type="checkbox" className="mt-1 shrink-0" checked={selected.includes(student.id)} onChange={event => setSelected(ids => event.target.checked ? [...ids, student.id] : ids.filter(id => id !== student.id))} />
+                  <span className="min-w-0 break-words">{student.name} · {student.rollNo} · {student.section}</span>
+                </label>)}
+              </div>
+              {!eligible.length && <p className="text-sm text-muted-foreground">No additional eligible students. Existing invitations and memberships are listed below.</p>}
+            </fieldset>
+          </ResourcePanel>
         <Button type="submit" disabled={pending || !selected.length}>{pending ? 'Sending…' : target ? 'Send invitations' : 'Create group and invite'}</Button></fieldset>
         {actionError && <p role="alert" className="text-destructive">{actionError}</p>}{message && <p role="status" className="text-sm text-primary">{message}</p>}
       </form>
     </CardContent></Card>}
     {data && !data.groups.length && <EmptyState title="No groups yet" description="Groups will appear here after students are invited." />}
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{data?.groups.map(group => <button key={group._id} className="rounded-xl border bg-white p-5 text-left hover:border-primary" onClick={() => setOpened(group._id)}><h2 className="font-semibold">{group.name}</h2><p className="mt-2 text-sm text-muted-foreground">{group.description}</p><p className="mt-3 text-sm">{group.participants.filter(p => p.status === 'accepted').length} members · {group.participants.filter(p => p.status === 'pending').length} invited</p></button>)}</div>
+    <div className="workspace-card-grid">{data?.groups.map(group => <button key={group._id} className="rounded-xl border bg-white p-5 text-left hover:border-primary" onClick={() => setOpened(group._id)}><h2 className="font-semibold">{group.name}</h2><p className="mt-2 text-sm text-muted-foreground">{group.description}</p><p className="mt-3 text-sm">{group.participants.filter(p => p.status === 'accepted').length} members · {group.participants.filter(p => p.status === 'pending').length} invited</p></button>)}</div>
   </>;
 }

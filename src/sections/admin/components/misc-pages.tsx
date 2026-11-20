@@ -188,7 +188,7 @@ function OrganizationSettingsForm({ organization }: { organization: AcceptedOrga
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  return <Card><CardHeader><CardTitle>Organization details</CardTitle></CardHeader><CardContent>
+  return <Card className="workspace-form-panel"><CardHeader><CardTitle>Organization details</CardTitle></CardHeader><CardContent>
     <form className="space-y-4" onSubmit={async event => {
       event.preventDefault(); setPending(true); setError(''); setMessage('');
       try { const response = await updateOrganization(organization._id, { orgName, orgEmail, phoneNumber, address }); setMessage(response.message); }
@@ -200,7 +200,7 @@ function OrganizationSettingsForm({ organization }: { organization: AcceptedOrga
         <label className="text-sm font-medium">Contact email<Input required type="email" value={orgEmail} onChange={event => setOrgEmail(event.target.value)} /></label>
         <label className="text-sm font-medium">Phone number<Input required type="tel" value={phoneNumber} onChange={event => setPhoneNumber(event.target.value)} /></label>
         <label className="text-sm font-medium">Address<Input required value={address} onChange={event => setAddress(event.target.value)} /></label>
-        <Button type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save organization details'}</Button>
+        <Button type="submit" className="justify-self-start sm:col-span-2" disabled={pending}>{pending ? 'Saving…' : 'Save organization details'}</Button>
       </fieldset>
       {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
       {message && <p role="status" className="mt-3 text-sm text-primary">{message}</p>}

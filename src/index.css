@@ -127,6 +127,35 @@
     @apply block min-h-24 w-full min-w-0 resize-y rounded-md border border-input bg-card px-3 py-2 text-base text-foreground placeholder:text-muted-foreground disabled:bg-muted sm:text-sm;
   }
 
+  .management-workspace :where(input:not([type]), input:is([type="text"], [type="search"], [type="email"], [type="tel"], [type="password"], [type="url"], [type="file"])) {
+    max-width: min(100%, 22rem);
+  }
+
+  .management-workspace :where(input:is([type="number"], [type="date"])) {
+    max-width: min(100%, 12rem);
+  }
+
+  .management-workspace :where(select) {
+    max-width: min(100%, 18rem);
+  }
+
+  .management-workspace :where(textarea) {
+    max-width: min(100%, 42rem);
+  }
+
+  .workspace-form-panel {
+    @apply w-full max-w-[46rem];
+  }
+
+  .workspace-card-grid {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  }
+
+  .workspace-card-grid > * {
+    @apply w-full min-w-0 max-w-sm;
+  }
+
   .management-workspace .section-intro-actions > button {
     @apply w-auto;
   }
