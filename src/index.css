@@ -120,7 +120,23 @@
   }
 
   .compact-select {
-    @apply block h-11 w-full min-w-0 rounded-md border border-input bg-white px-3 text-base text-foreground disabled:bg-muted disabled:text-muted-foreground sm:h-10 sm:text-sm;
+    @apply block h-11 w-full min-w-0 rounded-md border border-input bg-card px-3 text-base text-foreground disabled:bg-muted disabled:text-muted-foreground sm:h-10 sm:text-sm;
+  }
+
+  .workspace-textarea {
+    @apply block min-h-24 w-full min-w-0 resize-y rounded-md border border-input bg-card px-3 py-2 text-base text-foreground placeholder:text-muted-foreground disabled:bg-muted sm:text-sm;
+  }
+
+  .management-workspace .section-intro-actions > button {
+    @apply w-auto;
+  }
+
+  .workspace-directory-item {
+    @apply w-full min-w-0 rounded-lg border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/60;
+  }
+
+  .workspace-directory-item[aria-pressed="true"] {
+    @apply border-primary/60 bg-primary/5 ring-1 ring-primary/15;
   }
 
   .workspace-content {

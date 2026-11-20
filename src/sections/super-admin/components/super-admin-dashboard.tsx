@@ -1,4 +1,5 @@
 import { BarChart3, CreditCard, LifeBuoy, ShieldCheck } from "lucide-react";
+import { DashboardMetric } from "@/components/common/dashboard-metric";
 import { ApiNotice } from "@/components/common/admin-primitives";
 import { DonutProgress } from "@/components/common/donut-progress";
 import { EmptyState } from "@/components/common/empty-state";
@@ -32,21 +33,13 @@ export function SuperAdminDashboard({
     <>
       <SectionIntro
         eyebrow="Super Admin"
-        title="Platform operations across every organization."
+        title="Platform dashboard"
         description="Approve institutions, manage subscriptions, monitor platform usage, review support, and audit activity."
 
       />
       {loadError ? <ApiNotice message={loadError} /> : null}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => (
-          <Card key={metric.label}>
-            <CardContent className="min-h-28 p-5">
-              <p className="text-sm text-muted-foreground">{metric.label}</p>
-              <p className="mt-2 text-3xl font-bold">{metric.value}</p>
-              <p className="text-sm text-muted-foreground">{metric.detail}</p>
-            </CardContent>
-          </Card>
-        ))}
+        {metrics.map(metric => <DashboardMetric key={metric.label} {...metric} />)}
       </section>
       <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
         <Card>
@@ -81,9 +74,9 @@ export function SuperAdminDashboard({
           <CardContent className="space-y-3">
             {loading ? <SkeletonRows rows={4} /> : [
               { label: "Organization requests", value: requests.filter((request) => request.status !== "Approved").length, icon: ShieldCheck },
-              { label: "Support tickets", value: supportTickets.length, icon: LifeBuoy },
-              { label: "Plans active", value: "0", icon: CreditCard },
-              { label: "Audit events", value: auditLogs.length, icon: BarChart3 },
+              { label: "Support tickets", value: supportTickets.length || "—", icon: LifeBuoy },
+              { label: "Plans active", value: "—", icon: CreditCard },
+              { label: "Audit events", value: auditLogs.length || "—", icon: BarChart3 },
             ].map((item) => (
               <div key={item.label} className="flex items-center gap-3 rounded-lg border p-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-primary">

@@ -48,12 +48,12 @@ export function OrganizationsPage({ organizations, apiOrganizations, features, s
         <CardHeader className="shrink-0 gap-3">
           <div><CardTitle>Organization directory</CardTitle><CardDescription>{matching.length} of {organizations.length} institutions</CardDescription></div>
           <div className="relative"><Search aria-hidden="true" className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input className="pl-9" aria-label="Search organizations" placeholder="Search institutions" value={search} onChange={event => { setSearch(event.target.value); setVisible(50); }} /></div>
-          <select aria-label="Filter organizations by status" className="h-10 w-full rounded-md border bg-white px-3 text-sm" value={status} onChange={event => { setStatus(event.target.value); setVisible(50); }}><option value="all">All statuses</option><option value="Active">Active</option><option value="Suspended">Suspended</option></select>
+          <select aria-label="Filter organizations by status" className="compact-select" value={status} onChange={event => { setStatus(event.target.value); setVisible(50); }}><option value="all">All statuses</option><option value="Active">Active</option><option value="Suspended">Suspended</option></select>
         </CardHeader>
         <CardContent aria-label="Organization directory" tabIndex={0} className="panel-scroll max-h-80 space-y-2 pt-0 lg:max-h-none">
           {matching.slice(0, visible).map(org => {
             const count = featureIds(apiOrganizations.find(item => item._id === org.id)).length;
-            return <button key={org.id} aria-pressed={selectedOrg?.id === org.id} aria-controls="organization-details" className={`w-full min-w-0 rounded-lg border p-3 text-left transition-colors ${selectedOrg?.id === org.id ? 'border-primary/60 bg-blue-50 ring-1 ring-primary/10' : 'bg-white hover:border-blue-300 hover:bg-slate-50'}`} onClick={() => onSelectOrg(org.id)}>
+            return <button key={org.id} aria-pressed={selectedOrg?.id === org.id} aria-controls="organization-details" className="workspace-directory-item" onClick={() => onSelectOrg(org.id)}>
               <div className="flex items-start justify-between gap-2"><p className="min-w-0 truncate font-semibold">{org.name}</p><ChevronRight aria-hidden="true" className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" /></div>
               <p className="mt-1 text-xs text-muted-foreground">{org.students} students · {org.coordinators} coordinators</p>
               <div className="mt-2 flex flex-wrap items-center gap-2"><Badge variant={org.status === 'Active' ? 'secondary' : 'danger'}>{org.status}</Badge><span className="text-xs text-muted-foreground">{count} {count === 1 ? 'feature' : 'features'}</span></div>
@@ -105,10 +105,10 @@ function OrganizationDetails({ organization, summary, features, onUpdateDetails,
   }
 
   return <Card id="organization-details" aria-label="Selected organization details" className="flex min-h-0 scroll-mt-20 flex-col lg:max-h-[calc(100dvh-15rem)]">
-    <CardHeader className="shrink-0 border-b pb-0">
+    <CardHeader className="shrink-0 border-b">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3"><div className="min-w-0"><CardTitle className="text-xl [overflow-wrap:anywhere]">{summary.name}</CardTitle><CardDescription className="mt-1 [overflow-wrap:anywhere]">{organization.orgEmail}</CardDescription></div><Badge variant={summary.status === 'Active' ? 'secondary' : 'danger'}>{summary.status}</Badge></div>
-      <nav aria-label="Organization sections" className="!mt-4 flex gap-1 overflow-x-auto">
-        {(['overview', 'contact', 'features'] as const).map(item => <button key={item} disabled={!!busy} aria-pressed={tab === item} className={`min-h-11 shrink-0 border-b-2 px-3 text-sm font-semibold capitalize ${tab === item ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`} onClick={() => { setTab(item); setFeedback(null); }}>{item === 'features' ? `Features (${assigned.length})` : item === 'contact' ? 'Contact details' : 'Overview'}</button>)}
+      <nav aria-label="Organization sections" className="!mt-4 flex flex-wrap gap-2">
+        {(['overview', 'contact', 'features'] as const).map(item => <Button key={item} size="sm" variant={tab === item ? "default" : "outline"} disabled={!!busy} aria-pressed={tab === item} onClick={() => { setTab(item); setFeedback(null); }}>{item === 'features' ? `Features (${assigned.length})` : item === 'contact' ? 'Contact details' : 'Overview'}</Button>)}
       </nav>
     </CardHeader>
     <CardContent className="panel-scroll space-y-5 p-5" tabIndex={0} aria-label="Organization information">
@@ -124,7 +124,7 @@ function OrganizationDetails({ organization, summary, features, onUpdateDetails,
         <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">{([
           ['orgName', 'Organization name', 'text'], ['orgEmail', 'Organization email', 'email'], ['phoneNumber', 'Phone number', 'tel'], ['country', 'Country', 'text'], ['state', 'State', 'text'], ['city', 'City', 'text'], ['postalCode', 'Postal code', 'text'],
         ] as const).map(([field, label, type]) => <div key={field} className="min-w-0 space-y-1.5"><label htmlFor={`organization-${field}`} className="text-sm font-medium">{label}</label><Input id={`organization-${field}`} type={type} required={['orgName', 'orgEmail', 'phoneNumber'].includes(field)} aria-invalid={!!errors[field]} disabled={!!busy} value={form[field]} onChange={event => setForm(current => ({ ...current, [field]: event.target.value }))} /><FieldError message={errors[field]} /></div>)}</div>
-        <div className="space-y-1.5"><label htmlFor="organization-address" className="text-sm font-medium">Address</label><textarea id="organization-address" required rows={3} className="max-h-48 min-h-24 w-full resize-y rounded-md border bg-white px-3 py-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm" aria-invalid={!!errors.address} disabled={!!busy} value={form.address} onChange={event => setForm(current => ({ ...current, address: event.target.value }))} /><FieldError message={errors.address} /></div>
+        <div className="space-y-1.5"><label htmlFor="organization-address" className="text-sm font-medium">Address</label><textarea id="organization-address" required rows={3} className="workspace-textarea min-h-24 resize-y" aria-invalid={!!errors.address} disabled={!!busy} value={form.address} onChange={event => setForm(current => ({ ...current, address: event.target.value }))} /><FieldError message={errors.address} /></div>
         <div className="flex flex-wrap items-center gap-2 border-t pt-4"><Button type="submit" disabled={!!busy || !contactChanged}>{busy === 'contact' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{busy === 'contact' ? 'Saving…' : 'Save details'}</Button><Button variant="cancel" type="button" disabled={!!busy || !contactChanged} onClick={() => { setForm(contactForm(organization)); setErrors({}); setFeedback(null); }}><X className="h-4 w-4" />Cancel changes</Button></div>
       </form>}
       {tab === 'features' && <div className="space-y-4">

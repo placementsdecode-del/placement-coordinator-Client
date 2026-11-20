@@ -1,3 +1,3 @@
 export function FieldError({ message }: { message?: string }) {
-  return message ? <p role="alert" className="text-xs font-medium text-destructive">{message}</p> : null;
+  return message ? <span role="alert" className="block text-xs font-medium text-destructive">{message}</span> : null;
 }

@@ -18,7 +18,7 @@ export function SectionIntro({
         <h1 className="break-words text-2xl font-semibold leading-tight tracking-tight text-foreground md:text-[28px]">{title}</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
       </div>
-      {action ? <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto [&>button]:w-full sm:[&>button]:w-auto">{action}</div> : null}
+      {action ? <div className="section-intro-actions flex w-full shrink-0 flex-wrap gap-2 sm:w-auto [&>button]:w-full sm:[&>button]:w-auto">{action}</div> : null}
     </section>
   );
 }

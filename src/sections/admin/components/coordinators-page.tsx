@@ -71,8 +71,8 @@ export function CoordinatorsAdmin({
   return (
     <>
       <SectionIntro
-        eyebrow="Coordinators & Roles"
-        title="Manage teachers, coordinator access, and role permissions."
+        eyebrow="Coordinators"
+        title="Coordinators"
         description="Create coordinator accounts, assign them to sections, sync organization roles, and update permissions from one workspace."
         action={
           <Button onClick={handleSyncRoles} disabled={syncingRoles}>
@@ -84,7 +84,7 @@ export function CoordinatorsAdmin({
       <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_430px]">
         <Card>
           <CardHeader>
-            <CardTitle>Add Coordinator</CardTitle>
+            <CardTitle>Add coordinator</CardTitle>
             <CardDescription>Form for creating a placement coordinator account.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -129,33 +129,33 @@ export function CoordinatorsAdmin({
                 }
               }}
             >
-              <div className="space-y-1">
+              <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Coordinator name</span>
                 <Input required placeholder="Coordinator name" value={name} onChange={(event) => setName(event.target.value)} />
                 <FieldError message={coordinatorErrors.name} />
-              </div>
-              <div className="space-y-1">
+              </label>
+              <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Email address</span>
                 <Input required placeholder="Email address" value={email} onChange={(event) => setEmail(event.target.value)} />
                 <FieldError message={coordinatorErrors.email} />
-              </div>
-              <Input placeholder="Phone number" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} />
-              <div className="space-y-1">
-                <Input placeholder="Password optional" value={password} onChange={(event) => setPassword(event.target.value)} />
+              </label>
+              <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Phone number</span><Input type="tel" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} /></label>
+              <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Password (optional)</span>
+                <Input type="password" autoComplete="new-password" placeholder="Optional" value={password} onChange={(event) => setPassword(event.target.value)} />
                 <FieldError message={coordinatorErrors.password} />
-              </div>
-              <div className="space-y-1">
-                <select className="h-11 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={role} onChange={(event) => setRole(event.target.value)}>
+              </label>
+              <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Role</span>
+                <select className="compact-select" value={role} onChange={(event) => setRole(event.target.value)}>
                   <option value="">Select role</option>
                   {roles.map((item) => <option key={item.id}>{item.name}</option>)}
                 </select>
                 <FieldError message={coordinatorErrors.role} />
-              </div>
-              <div className="space-y-1">
-                <select className="h-11 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={section} onChange={(event) => setSection(event.target.value)}>
+              </label>
+              <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Cohort</span>
+                <select className="compact-select" value={section} onChange={(event) => setSection(event.target.value)}>
                   <option value="">Select section</option>
                   {sections.map((item) => <option key={item.id}>{item.name}</option>)}
                 </select>
                 <FieldError message={coordinatorErrors.section} />
-              </div>
+              </label>
               <Button type="submit" disabled={coordinatorSubmitting}>
                 {coordinatorSubmitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
                 {coordinatorSubmitting ? "Adding..." : "Add Coordinator"}
@@ -165,12 +165,12 @@ export function CoordinatorsAdmin({
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Create Role</CardTitle>
+            <CardTitle>Create role</CardTitle>
             <CardDescription>Define coordinator permissions.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Input placeholder="Role name" value={roleName} onChange={(event) => setRoleName(event.target.value)} />
-            <textarea className="min-h-24 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" placeholder="Comma-separated permissions" value={permissions} onChange={(event) => setPermissions(event.target.value)} />
+            <textarea className="workspace-textarea min-h-24" placeholder="Comma-separated permissions" value={permissions} onChange={(event) => setPermissions(event.target.value)} />
             <Button
               onClick={() => {
                 const nextErrors: Record<string, string> = {};

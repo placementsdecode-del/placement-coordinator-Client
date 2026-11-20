@@ -26,7 +26,7 @@ export function WorkReviews({ workId }: { workId: string }) {
         catch (reason) { setActionError(reason instanceof Error ? reason.message : 'Unable to save feedback'); }
         finally { setPending(''); }
       }}>
-        <label className="block text-sm">Feedback<textarea name="feedback" required maxLength={5000} className="mt-1 min-h-20 w-full rounded-lg border p-2" /></label>
+        <label className="block text-sm">Feedback<textarea name="feedback" required maxLength={5000} className="workspace-textarea mt-1 min-h-20" /></label>
         <Button type="submit" size="sm" disabled={!!pending}>{pending === submission._id ? 'Saving…' : 'Review response'}</Button>
       </form>}
     </article>)}

@@ -55,9 +55,8 @@ export function RequestsPage({
             {loading ? <SkeletonRows rows={4} /> : requests.map((request) => (
               <button
                 key={request.id}
-                className={`grid w-full gap-3 rounded-lg border p-3 text-left md:grid-cols-[minmax(0,1fr)_130px] md:items-center ${
-                  selectedRequest?.id === request.id ? "border-primary bg-primary/5" : "bg-white"
-                }`}
+                aria-pressed={selectedRequest?.id === request.id}
+                className="workspace-directory-item space-y-2"
                 onClick={() => setSelectedRequestId(request.id)}
               >
                 <div className="min-w-0">

@@ -113,7 +113,7 @@ export function CreateStudentForm({
             </label>
             <FieldError message={errors.batch} />
           </div>
-          <select aria-label="Primary cohort" className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={form.section} onChange={(event) => setForm((current) => ({ ...current, section: event.target.value }))}>
+          <select aria-label="Primary cohort" className="compact-select" value={form.section} onChange={(event) => setForm((current) => ({ ...current, section: event.target.value }))}>
             <option value="">No section</option>
             {sections.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
           </select>
@@ -241,7 +241,7 @@ export function CreateSectionForm({ onCreateSection, initialSection }: { onCreat
             <FieldError message={errors.academicYear} />
           </label>
           <label className="space-y-1 text-sm font-medium">Status
-            <select className="h-11 w-full rounded-md border bg-white px-3" value={status} onChange={(event) => setStatus(event.target.value)}>
+            <select className="compact-select" value={status} onChange={(event) => setStatus(event.target.value)}>
               <option>Active</option><option>Inactive</option>
             </select>
           </label>

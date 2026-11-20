@@ -5,6 +5,7 @@ import type { ResourceStatus } from '@/hooks/use-api-resource';
 import { useState } from 'react';
 import { listWork, createWork, publishWork } from '@/services/work.api.service';
 import { useCommunityData } from './use-community-data';
+import { EmptyState } from '@/components/common/empty-state';
 import { SectionIntro } from '@/components/common/section-intro';
 import { PageSkeleton, LoadError } from '@/components/common/loading-state';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -22,12 +23,13 @@ export function WorkAdmin({ sections, sectionsStatus, initialKind = 'task' }: { 
   return <><SectionIntro eyebrow="Section assignments" title="Publish work" description="Save a draft or publish to the selected sections. Published work appears in students’ notifications and Assigned Work." />
     <Card><CardContent className="p-5"><form className="space-y-4" onSubmit={event => { event.preventDefault(); const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement; void save(() => createWork({ title, instructions, kind, assignedSections: audience, status: submitter?.value || 'draft' }), true); }}><fieldset disabled={pending} className="space-y-4">
       <label className="block text-sm font-medium">Title<Input required maxLength={200} value={title} onChange={event => setTitle(event.target.value)} /></label>
-      <label className="block text-sm font-medium">Type<select aria-label="Type" className="h-11 w-full rounded-md border bg-white px-3" value={kind} onChange={event => setKind(event.target.value)}>{['task', 'homework', 'activity', 'announcement'].map(type => <option key={type}>{type}</option>)}</select></label>
-      <label className="block text-sm font-medium">Instructions<textarea required maxLength={10000} className="min-h-32 w-full rounded-md border p-3" value={instructions} onChange={event => setInstructions(event.target.value)} /></label>
+      <label className="block text-sm font-medium">Type<select aria-label="Type" className="compact-select" value={kind} onChange={event => setKind(event.target.value)}>{['task', 'homework', 'activity', 'announcement'].map(type => <option key={type}>{type}</option>)}</select></label>
+      <label className="block text-sm font-medium">Instructions<textarea required maxLength={10000} className="workspace-textarea min-h-32" value={instructions} onChange={event => setInstructions(event.target.value)} /></label>
       <ResourcePanel resource={sectionsStatus} label="Cohort choices"><fieldset className="rounded-md border p-3"><legend className="px-2 text-sm font-semibold">Assigned sections</legend>{sections.filter(section => section.status === 'Active').map(section => <label key={section.id} className="flex gap-3 p-2 text-sm"><input type="checkbox" checked={audience.includes(section.id)} onChange={event => setAudience(ids => event.target.checked ? [...ids, section.id] : ids.filter(id => id !== section.id))} />{section.name} · {section.code}</label>)}</fieldset></ResourcePanel>
-      <div className="flex flex-wrap gap-2"><Button type="submit" value="draft" disabled={!audience.length || pending}>Save draft</Button><Button type="submit" value="published" disabled={!audience.length || pending}>{pending ? 'Saving…' : 'Publish and notify'}</Button></div>
+      <div className="flex flex-wrap gap-2"><Button type="submit" value="draft" variant="outline" disabled={!audience.length || pending}>Save draft</Button><Button type="submit" value="published" disabled={!audience.length || pending}>{pending ? 'Saving…' : 'Publish and notify'}</Button></div>
     </fieldset></form></CardContent></Card>
     {actionError && <p role="alert" className="text-destructive">{actionError}</p>}{message && <p role="status" className="text-primary">{message}</p>}
+    {data && !data.work.length && <EmptyState title="No assignments yet" description="Drafts and published work appear here after you save them." />}
     {data?.work.map(item => <Card key={item._id}><CardHeader><CardTitle>{item.title}</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{item.kind} · {item.status} · {item.assignedSections?.map(section => `${section.name} (${section.code})`).join(', ')}</p><div className="my-3"><ExpandableText text={item.instructions} label="instructions" /></div>{item.status === 'published' && item.kind !== 'announcement' && <Button variant="outline" onClick={() => setReviewing(reviewing === item._id ? '' : item._id)}>{reviewing === item._id ? 'Close responses' : 'View responses'}</Button>}{reviewing === item._id && <WorkReviews workId={item._id} />}{item.status === 'draft' && <Button disabled={pending} onClick={() => void save(() => publishWork(item._id))}>Publish and notify</Button>}</CardContent></Card>)}
   </>;
 }

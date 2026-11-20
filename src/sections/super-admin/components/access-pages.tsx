@@ -105,36 +105,36 @@ export function UsersPage({
     <>
       <SectionIntro
         eyebrow="Users"
-        title="Platform-wide users across organizations."
+        title="Users"
         description="Monitor organization admins, coordinators, and account status across tenants."
       />
       <Card>
         <CardHeader>
-          <CardTitle>Create User</CardTitle>
-          <CardDescription>Superadmins must provide an organization id for tenant users.</CardDescription>
+          <CardTitle>Create user</CardTitle>
+          <CardDescription>Choose an organization and a role for the account.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid max-w-5xl gap-3 md:grid-cols-5" onSubmit={createUser}>
-            <div className="space-y-1"><Input required placeholder="Name" value={name} onChange={(event) => setName(event.target.value)} /><FieldError message={errors.name} /></div>
-            <div className="space-y-1"><Input required type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} /><FieldError message={errors.email} /></div>
-            <div className="space-y-1">
-              <select className="h-11 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={organization} onChange={(event) => setOrganization(event.target.value)}>
+          <form className="grid max-w-5xl gap-4 sm:grid-cols-2 xl:grid-cols-3" onSubmit={createUser}>
+            <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Name</span><Input required placeholder="Name" value={name} onChange={(event) => setName(event.target.value)} /><FieldError message={errors.name} /></label>
+            <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Email address</span><Input required type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} /><FieldError message={errors.email} /></label>
+            <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Organization</span>
+              <select className="compact-select" value={organization} onChange={(event) => setOrganization(event.target.value)}>
                 <option value="">Select organization</option>
                 {organizations.map((item) => <option key={item._id} value={item._id}>{item.orgName}</option>)}
               </select>
               <FieldError message={errors.organization} />
-            </div>
-            <div className="space-y-1">
-              <select className="h-11 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={roleName} onChange={(event) => setRoleName(event.target.value)}>
+            </label>
+            <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Role</span>
+              <select className="compact-select" value={roleName} onChange={(event) => setRoleName(event.target.value)}>
                 <option value="">Select role</option>
                 <option value="admin">Admin</option>
                 <option value="teacher">Teacher</option>
                 <option value="student">Student</option>
               </select>
               <FieldError message={errors.roleName} />
-            </div>
-            <div className="space-y-1"><Input placeholder="Password optional" value={password} onChange={(event) => setPassword(event.target.value)} /><FieldError message={errors.password} /></div>
-            <div className="flex justify-end md:col-span-5">
+            </label>
+            <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Password (optional)</span><Input type="password" autoComplete="new-password" placeholder="Optional" value={password} onChange={(event) => setPassword(event.target.value)} /><FieldError message={errors.password} /></label>
+            <div className="flex justify-end sm:col-span-2 xl:col-span-3">
               <Button type="submit" disabled={creating}>
                 {creating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 {creating ? "Creating..." : "Create User"}
@@ -147,15 +147,16 @@ export function UsersPage({
         <CardContent className="space-y-3 p-4 sm:p-5">
           {loading ? <SkeletonRows rows={4} /> : users.map((user) => (
             <div key={user.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_150px_130px_150px] md:items-center">
-              <div>
-                <p className="font-semibold">{user.name}</p>
-                <p className="text-sm text-muted-foreground">{user.email} · {organizationLabel(user.organization)}</p>
+              <div className="min-w-0">
+                <p className="break-words font-semibold">{user.name}</p>
+                <p className="break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">{user.email} · {organizationLabel(user.organization)}</p>
               </div>
               {user.role === "superadmin" ? (
                 <Badge variant="outline">Super Admin</Badge>
               ) : (
                 <select
-                  className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
+                  className="compact-select"
+                  aria-label={`Role for ${user.name}`}
                   value={user.role}
                   disabled={!hasApiUsers || Boolean(updatingUserId)}
                   onChange={(event) => changeUserRole(user.id, event.target.value as "admin" | "teacher" | "student")}
@@ -236,19 +237,19 @@ export function FeaturesPage({
     <>
       <SectionIntro
         eyebrow="Features"
-        title="Manage platform modules available to organizations."
+        title="Features"
         description="Create features and control default enablement for new organization requests."
       />
       <Card>
         <CardHeader>
-          <CardTitle>Create Feature</CardTitle>
+          <CardTitle>Create feature</CardTitle>
           <CardDescription>Feature keys should be stable API identifiers.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid max-w-5xl gap-3 md:grid-cols-[180px_220px_minmax(0,1fr)_160px]" onSubmit={createFeature}>
-            <div className="space-y-1"><Input required placeholder="feature-key" value={form.key} onChange={(event) => setForm((current) => ({ ...current, key: event.target.value }))} /><FieldError message={errors.key} /></div>
-            <div className="space-y-1"><Input required placeholder="Feature name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /><FieldError message={errors.name} /></div>
-            <div className="space-y-1"><Input required placeholder="Description" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} /><FieldError message={errors.description} /></div>
+          <form className="grid max-w-5xl gap-4 sm:grid-cols-2" onSubmit={createFeature}>
+            <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Feature key</span><Input required placeholder="feature-key" value={form.key} onChange={(event) => setForm((current) => ({ ...current, key: event.target.value }))} /><FieldError message={errors.key} /></label>
+            <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Feature name</span><Input required placeholder="Feature name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /><FieldError message={errors.name} /></label>
+            <label className="block min-w-0 space-y-1 text-sm font-medium"><span>Description</span><Input required placeholder="Description" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} /><FieldError message={errors.description} /></label>
             <label className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground">
               <input
                 className="h-5 w-5 accent-primary"
@@ -258,7 +259,7 @@ export function FeaturesPage({
               />
               Default
             </label>
-            <div className="flex justify-end md:col-span-4">
+            <div className="flex justify-end sm:col-span-2">
               <Button type="submit" disabled={creating}>
                 {creating ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                 {creating ? "Creating..." : "Create Feature"}
@@ -357,8 +358,8 @@ export function RolesSettingsPage({
   return (
     <>
       <SectionIntro
-        eyebrow="Roles"
-        title="Create organization roles and update permissions."
+        eyebrow="Settings"
+        title="Roles and permissions"
         description="Sync default organization roles, then assign permissions and use the Users page to assign roles to people."
         action={
           <Button onClick={syncRoles} disabled={syncing}>
@@ -373,7 +374,7 @@ export function RolesSettingsPage({
           <CardDescription>Choose the tenant whose roles you want to manage.</CardDescription>
         </CardHeader>
         <CardContent>
-          <select className="h-11 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}>
+          <select aria-label="Filter roles by organization" className="compact-select max-w-md" value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}>
             <option value="">All roles</option>
             {organizations.map((organization) => <option key={organization._id} value={organization._id}>{organization.orgName}</option>)}
           </select>

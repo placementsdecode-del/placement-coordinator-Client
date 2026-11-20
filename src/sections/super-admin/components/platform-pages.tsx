@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronDown, ChevronRight, FileText, GitCommitHorizontal, LoaderCircle } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, FileText, GitCommitHorizontal, CreditCard, LifeBuoy, FileClock } from "lucide-react";
+import { DashboardMetric } from "@/components/common/dashboard-metric";
+import { EmptyState } from "@/components/common/empty-state";
+import { PageSkeleton, LoadError } from "@/components/common/loading-state";
 import { ChangePasswordCard } from "@/components/common/change-password-card";
 import { DonutProgress } from "@/components/common/donut-progress";
 import { SectionIntro } from "@/components/common/section-intro";
@@ -11,7 +14,10 @@ import { cn } from "@/lib/utils";
 import type { CommitEntry, OrganizationRow } from "@/types/super-admin";
 
 export function PlansPage() {
-  return <><SectionIntro eyebrow="Plans" title="Subscription plans" description="Billing requires configured plans and a payment provider." /><Card><CardContent className="p-5 text-sm text-muted-foreground">Subscription billing is awaiting setup. Organization access is managed through Requests and Organizations.</CardContent></Card></>;
+  return <>
+    <SectionIntro eyebrow="Plans" title="Subscription plans" description="Manage platform billing once plans are configured." />
+    <EmptyState icon={CreditCard} title="Billing is awaiting setup" description="Organization access is managed through Requests and Organizations." />
+  </>;
 }
 
 export function AnalyticsPage({ organizations }: { organizations: OrganizationRow[] }) {
@@ -29,6 +35,7 @@ export function AnalyticsPage({ organizations }: { organizations: OrganizationRo
             <CardDescription>Percentage of accounts enabled for sign-in.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            {!organizations.length && <EmptyState title="No organization accounts" description="Account activity appears here after organizations are approved." />}
             {organizations.map((org) => (
               <div key={org.id} className="rounded-lg border p-3">
                 <DonutProgress value={org.usage} label={org.name} caption={`${org.students} students`} size="sm" />
@@ -55,24 +62,22 @@ export function SupportPage() {
     <>
       <SectionIntro
         eyebrow="Support"
-        title="Support requests from organizations."
+        title="Support requests"
         description="Track, escalate, and resolve institution support requests."
       />
-      <Card>
+      {!supportTickets.length ? <EmptyState icon={LifeBuoy} title="Support requests are awaiting setup" description="Requests from organizations will appear here once collection is enabled." /> : <Card>
         <CardContent className="space-y-3 p-4 sm:p-5">
-          {!supportTickets.length && <p className="text-sm text-muted-foreground">Support ticket collection is awaiting setup.</p>}
           {supportTickets.map((ticket) => (
-            <div key={ticket.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_100px_120px] md:items-center">
+            <div key={ticket.id} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
               <div>
                 <p className="font-semibold">{ticket.id} · {ticket.title}</p>
                 <p className="text-sm text-muted-foreground">{ticket.organization}</p>
               </div>
               <Badge variant={ticket.priority === "Critical" ? "danger" : ticket.priority === "High" ? "warning" : "outline"}>{ticket.priority}</Badge>
-              <span className="text-sm">{ticket.priority}</span>
             </div>
           ))}
         </CardContent>
-      </Card>
+      </Card>}
     </>
   );
 }
@@ -82,10 +87,10 @@ export function AuditPage() {
     <>
       <SectionIntro
         eyebrow="Audit Logs"
-        title="Platform activity and compliance trail."
+        title="Audit logs"
         description="Review actions across organizations, subscriptions, settings, and user access."
       />
-      <Card>
+      {auditLogs.length ? <Card>
         <CardContent className="space-y-3 p-4 sm:p-5">
           {auditLogs.map((log, index) => (
             <div key={log} className="rounded-lg border p-3 text-sm">
@@ -93,7 +98,7 @@ export function AuditPage() {
             </div>
           ))}
         </CardContent>
-      </Card>
+      </Card> : <EmptyState icon={FileClock} title="No audit events available" description="Recorded platform activity will appear here when audit data is available." />}
     </>
   );
 }
@@ -101,17 +106,19 @@ export function AuditPage() {
 export function ChangelogPage() {
   const [openHash, setOpenHash] = useState<string | null>(null);
   const [commitHistory, setCommitHistory] = useState<CommitEntry[] | null>(null);
+  const [historyError, setHistoryError] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   // Load the (large) commit data only when this admin page is opened.
   useEffect(() => {
     let active = true;
     import("@/data/commit-history").then((module) => {
       if (active) setCommitHistory(module.commitHistory);
-    });
+    }).catch(() => { if (active) setHistoryError(true); });
     return () => {
       active = false;
     };
-  }, []);
+  }, [retry]);
 
   const latest = commitHistory?.[0];
   const areas = useMemo(
@@ -119,16 +126,8 @@ export function ChangelogPage() {
     [commitHistory],
   );
 
-  if (!commitHistory) {
-    return (
-      <>
-        <SectionIntro eyebrow="Changelog" title="Recent code changes across the platform." description="Loading commit history..." />
-        <div className="flex min-h-[240px] items-center justify-center">
-          <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </>
-    );
-  }
+  if (historyError) return <LoadError message="Unable to load commit history." onRetry={() => { setHistoryError(false); setRetry(value => value + 1); }} />;
+  if (!commitHistory) return <PageSkeleton label="Loading commit history" />;
 
   const openCommit = commitHistory.find((commit) => commit.hash === openHash);
 
@@ -140,30 +139,14 @@ export function ChangelogPage() {
     <>
       <SectionIntro
         eyebrow="Changelog"
-        title="Recent code changes across the platform."
+        title="Changelog"
         description="Every pushed commit to the application — with its short hash. Open a commit to see exactly which files changed in the deployed build."
       />
 
       <section className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="p-4 sm:p-5">
-            <p className="text-sm text-muted-foreground">Tracked commits</p>
-            <p className="mt-1 text-2xl font-bold">{commitHistory.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 sm:p-5">
-            <p className="text-sm text-muted-foreground">Latest change</p>
-            <p className="mt-1 font-mono text-lg font-bold text-primary">{latest?.hash ?? "—"}</p>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">{latest?.date}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 sm:p-5">
-            <p className="text-sm text-muted-foreground">Areas touched</p>
-            <p className="mt-1 text-2xl font-bold">{areas.length}</p>
-          </CardContent>
-        </Card>
+        <DashboardMetric label="Tracked commits" value={commitHistory.length} />
+        <DashboardMetric label="Latest change" value={<code className="text-lg text-primary">{latest?.hash ?? "—"}</code>} detail={latest?.date} />
+        <DashboardMetric label="Areas touched" value={areas.length} />
       </section>
 
       <Card>

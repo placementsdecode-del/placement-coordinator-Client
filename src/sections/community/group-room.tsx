@@ -72,7 +72,7 @@ export function GroupRoom({ group, onBack }: { group: StudentGroup; onBack: () =
         catch (reason) { setActionError(reason instanceof Error ? reason.message : 'Message could not be sent'); }
         finally { setPending(false); }
       }}>
-        <label className="block text-sm font-medium">Message<textarea required maxLength={5000} className="mt-2 min-h-24 w-full rounded-lg border p-3" value={text} disabled={pending} onChange={event => setText(event.target.value)} /></label>
+        <label className="block text-sm font-medium">Message<textarea required maxLength={5000} className="workspace-textarea mt-2 min-h-24" value={text} disabled={pending} onChange={event => setText(event.target.value)} /></label>
         <Button disabled={pending || !text.trim()}>{pending ? 'Sending…' : 'Send message'}</Button>
         {actionError && <p role="alert" className="text-sm text-destructive">{actionError}</p>}
       </form>

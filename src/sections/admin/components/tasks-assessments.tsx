@@ -3,7 +3,6 @@ import type { ResourceStatus } from '@/hooks/use-api-resource';
 import { listGroups } from '@/services/groups.api.service';
 import { useApiResource } from '@/hooks/use-api-resource';
 import { AssessmentReviewQueue } from '@/sections/readiness/assessment-attempts';
-import { Breadcrumbs } from '@/components/common/breadcrumbs';
 import { useState } from "react";
 import { FileText, LoaderCircle, Plus } from "lucide-react";
 import { EmptyState } from "@/components/common/empty-state";
@@ -108,7 +107,6 @@ export function AssessmentsAdmin({
         action={<Button onClick={() => { setCreating(v => !v); setOpened(""); }}>{creating ? "Close builder" : "Create assessment"}</Button>}
         description="Build written tests, mock interviews, group discussions, coding rounds, and company-specific assessments."
       />
-      {!opened && <Breadcrumbs items={[{ label: "Assessments", onClick: opened ? () => setOpened("") : undefined }, ...(opened ? [{ label: assessments.find(a => a.id === opened)?.title || "Assessment" }] : [])]} />}
       {opened && <AssessmentReviewQueue key={opened} assessmentId={opened} title={assessments.find(a => a.id === opened)?.title} onBack={() => setOpened("")} />}
       {creating && <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <Card>
@@ -126,7 +124,7 @@ export function AssessmentsAdmin({
               <label className="text-sm font-medium">Assessment skill<Input aria-label="Assessment skill" placeholder="DSA, MCAT, medical entrance, competitive exams…" value={type} onChange={event => setType(event.target.value)} /></label>
 
               <div className="space-y-1">
-              <select className="h-11 w-full rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)}>
+              <select className="compact-select" value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)}>
                 <option value="">Select a cohort or group</option>
                 {groupData?.groups.map(g => <option key={g._id} value={`group:${g._id}`}>Group · {g.name}</option>)}
                 {sections.map((section) => <option key={section.id} value={section.id}>{section.name} · {section.code}</option>)}
@@ -138,7 +136,7 @@ export function AssessmentsAdmin({
               </div>
 
             </div>
-            <textarea className="min-h-28 w-full rounded-md border bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" placeholder="Instructions students should read before starting" value={instructions} onChange={(event) => setInstructions(event.target.value)} />
+            <textarea className="workspace-textarea min-h-28" placeholder="Instructions students should read before starting" value={instructions} onChange={(event) => setInstructions(event.target.value)} />
             <FieldError message={errors.instructions} />
             <label className="block text-sm font-medium">Pass percentage<Input type="number" min="0" max="100" value={passingPercentage} onChange={e => setPassingPercentage(e.target.value)} /></label>
             <Input placeholder="Grading rubric" maxLength={5000} value={rubric} onChange={(event) => setRubric(event.target.value)} />
@@ -148,7 +146,7 @@ export function AssessmentsAdmin({
                 <Badge variant="outline">{questions.length} {questions.length === 1 ? "question" : "questions"}</Badge>
               </div>
               <div className="mt-3 grid gap-3 sm:grid-cols-[160px_120px_minmax(0,1fr)]">
-                <select className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" value={questionType} onChange={(event) => setQuestionType(event.target.value)}>
+                <select className="compact-select" value={questionType} onChange={(event) => setQuestionType(event.target.value)}>
                   <option>MCQ</option>
                   <option>Short Answer</option>
                   <option>Code Question</option>
@@ -189,7 +187,7 @@ export function AssessmentsAdmin({
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
-              <label className="text-sm font-medium">Difficulty<select aria-label="Assessment difficulty" className="h-11 w-full rounded-md border bg-white px-3" value={difficulty} onChange={event => setDifficulty(event.target.value)}><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label>
+              <label className="text-sm font-medium">Difficulty<select aria-label="Assessment difficulty" className="compact-select" value={difficulty} onChange={event => setDifficulty(event.target.value)}><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label>
               <label className="text-sm font-medium">Duration (minutes)<Input type="number" min="1" max="600" value={duration} onChange={event => setDuration(event.target.value)} /></label>
               <label className="text-sm font-medium">Attempts allowed<Input type="number" min="1" max="20" value={attemptsAllowed} onChange={event => setAttemptsAllowed(event.target.value)} /></label>
             </div>
