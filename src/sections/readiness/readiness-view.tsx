@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { ReadinessPolicy, ReadinessQuery, ReadinessReport } from '@/types/readiness';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { scoreText } from '@/lib/utils';
 export const selectClass = 'h-11 w-full rounded-md border bg-white px-3 text-sm';
@@ -10,24 +10,70 @@ export function FilterBar({ policies, query, onChange, children }: { policies: R
     {!query.months && <><label className="text-sm font-medium">From (UTC)<input aria-label="From date" type="date" className={selectClass} value={query.from || ''} onChange={event => onChange({ ...query, from: event.target.value })} /></label><label className="text-sm font-medium">To (UTC)<input aria-label="To date" type="date" className={selectClass} value={query.to || ''} onChange={event => onChange({ ...query, to: event.target.value })} /></label></>}{children}</div>;
 }
 export function ReadinessView({ report }: { report: ReadinessReport }) {
+  const [evidenceLimit, setEvidenceLimit] = useState(10);
   const { activity } = report;
-  const points = report.history.map((point, index) => point.overall === null ? null : `${30 + index * 100},${180 - point.overall * 15}`).filter(Boolean).join(' ');
-  return <>
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
-      ['Readiness', `${scoreText(report.overall)} / 10`, report.status],
-      ['Active learning', `${activity.activeMinutes} min`, `${activity.activeDays} active days · ${activity.streak} day streak`],
-      ['Problems solved', `${activity.problemsSolved} / ${activity.problemsAttempted}`, `${activity.submissions} submissions · self-reported`],
-      ['Assessments completed', String(activity.assessmentsCompleted), `${activity.gradedAttempts} graded attempts · ${activity.pendingReview} awaiting review`],
-    ].map(([label, value, detail]) => <Card key={label}><CardContent className="p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-2 text-3xl font-semibold tabular-nums">{value}</p><p className="mt-2 text-sm text-muted-foreground">{detail}</p></CardContent></Card>)}</div>
-    <Card><CardContent className="space-y-3 p-5"><div className="flex flex-wrap items-center gap-2"><Badge>{report.eligibility.status}</Badge><Badge variant="outline">{report.coverage}% skill-weight coverage</Badge><Badge variant="outline">{report.evidenceCount} scored records</Badge><Badge variant="outline">{report.policy.label} · v{report.policy.version}</Badge></div>
-      {report.provisional && <p className="font-medium text-amber-700">Provisional score: some skills lack sufficient evidence. Missing evidence is not a zero.</p>}
-      <p className="text-sm text-muted-foreground">{report.formula}</p>
-      <p className="text-xs text-muted-foreground">Active time is browser-reported on learning pages, paused when hidden, unfocused, or idle for 60 seconds. It is not a measure of ability. Readiness rules are configurable decision support, not a hiring probability.</p>
-      {report.eligibility.reasons.length > 0 && <ul className="list-disc space-y-1 pl-5 text-sm">{report.eligibility.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}
+  const daily = report.daily.slice(-14);
+  const maximumMinutes = Math.max(1, ...daily.map(day => day.minutes));
+  const metrics = [
+    { label: 'Readiness', value: report.overall === null ? 'Awaiting results' : `${scoreText(report.overall)} / 10`, detail: report.overall === null ? 'Complete graded assessments to build your score.' : report.status },
+    { label: 'Active learning', value: `${activity.activeMinutes} min`, detail: `${activity.activeDays} active days` },
+    { label: 'Problems solved', value: `${activity.problemsSolved} / ${activity.problemsAttempted}`, detail: `${activity.submissions} submissions` },
+    { label: 'Assessments', value: String(activity.assessmentsCompleted), detail: `${activity.pendingReview} awaiting review` },
+  ];
+  return <div className="readiness-report space-y-5">
+    <div className="readiness-metrics">
+      {metrics.map((metric, index) => <Card key={metric.label} className={index === 0 ? 'border-slate-900 bg-slate-900 text-white' : ''}><CardContent className="p-5">
+        <p className={`text-sm ${index === 0 ? 'text-slate-300' : 'text-muted-foreground'}`}>{metric.label}</p>
+        <p className="mt-3 break-words text-2xl font-semibold tracking-tight tabular-nums">{metric.value}</p>
+        <p className={`mt-2 text-sm leading-6 ${index === 0 ? 'text-slate-300' : 'text-muted-foreground'}`}>{metric.detail}</p>
+      </CardContent></Card>)}
+    </div>
+
+    <Card><CardContent className="space-y-4 p-5">
+      <div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{report.eligibility.status}</Badge><span className="text-sm text-muted-foreground">{report.policy.label} · {report.evidenceCount} scored records</span></div>
+      {report.provisional && <p className="text-sm leading-6 text-muted-foreground">Your score will become more representative as you complete assessments across the required skills.</p>}
+      {report.eligibility.reasons.length > 0 && <ul className="list-disc space-y-1 pl-5 text-sm leading-6">{report.eligibility.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}
+      <details className="rounded-lg bg-slate-50 p-3 text-sm">
+        <summary className="cursor-pointer font-medium">How this score is calculated</summary>
+        <div className="mt-3 space-y-2 leading-6 text-muted-foreground"><p>{report.formula}</p><p>{report.coverage}% skill coverage · policy version {report.policy.version}.</p><p>Learning time records activity. Readiness uses graded evidence and the selected role’s requirements.</p></div>
+      </details>
     </CardContent></Card>
-    <div className="grid gap-4 xl:grid-cols-2"><Card><CardHeader><CardTitle>Readiness over the selected window</CardTitle></CardHeader><CardContent>{points ? <svg role="img" aria-label="Readiness trend from zero to ten" viewBox="0 0 560 220" className="w-full"><path d="M30 30 V180 H535" fill="none" stroke="#cbd5e1" /><text x="4" y="36" fontSize="12">10</text><text x="12" y="180" fontSize="12">0</text><polyline points={points} fill="none" stroke="#2563eb" strokeWidth="3" />{report.history.map((point, index) => point.overall !== null && <g key={point.at}><circle cx={30 + index * 100} cy={180 - point.overall * 15} r="4" fill="#2563eb" /><text x={30 + index * 100} y="204" textAnchor="middle" fontSize="11">{point.at.slice(5, 10)}</text></g>)}</svg> : <p className="py-12 text-center text-muted-foreground">Complete graded assessments to build your trend.</p>}<p className="text-xs text-muted-foreground">Recomputed with this policy version at each checkpoint. Early points may have insufficient evidence.</p></CardContent></Card>
-    <Card><CardHeader><CardTitle>Learning consistency</CardTitle></CardHeader><CardContent><div className="flex h-40 items-end gap-1 overflow-x-auto" aria-label="Active minutes by day">{report.daily.length ? report.daily.map(day => <div key={day.day} title={`${day.day}: ${day.minutes} minutes`} className="min-w-3 flex-1 rounded-t bg-blue-500" style={{ height: `${Math.max(2, day.minutes / Math.max(...report.daily.map(item => item.minutes), 1) * 100)}%` }} />) : <p className="m-auto text-sm text-muted-foreground">No active learning recorded in this window.</p>}</div><p className="mt-3 text-xs text-muted-foreground">UTC days with recorded activity. A streak day needs at least one tracked minute. Time never adds readiness points.</p></CardContent></Card></div>
-    <div className="grid gap-4 lg:grid-cols-2">{report.skills.map(skill => <Card key={skill.key}><CardHeader><div className="flex items-center justify-between"><CardTitle>{skill.label}</CardTitle><span className="text-xl font-semibold">{scoreText(skill.score)} / 10</span></div></CardHeader><CardContent className="space-y-3"><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-blue-600" style={{ width: `${(skill.score || 0) * 10}%` }} /></div><p className="text-sm text-muted-foreground">{skill.mandatory ? 'Required' : 'Optional'} · minimum {skill.minimum}/10 · weight {skill.weight} · {skill.recentSamples}/{report.policy.minSamples} recent independent evaluations</p><div className="flex flex-wrap gap-2"><Badge variant="outline">{skill.trend}</Badge><Badge variant="outline">{skill.consistency}</Badge></div><p className="text-sm">{skill.recommendation}</p><p className="text-xs text-muted-foreground">First-attempt average: {scoreText(skill.firstAverage)} · latest: {scoreText(skill.latestAverage)} · last evaluated: {skill.lastAt?.slice(0, 10) || 'Never'}</p><div className="grid grid-cols-3 gap-2">{skill.difficulties.map(item => <div key={item.difficulty} className="rounded-md border p-2 text-xs"><p className="capitalize">{item.difficulty}</p><p className="font-semibold">{scoreText(item.score)} / 10</p><p>{item.samples} evaluations</p></div>)}</div></CardContent></Card>)}</div>
-    <Card><CardHeader><CardTitle>Evidence history</CardTitle></CardHeader><CardContent className="space-y-3">{report.evidence.length ? report.evidence.map(item => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3"><div><p className="font-semibold">{item.title}</p><p className="text-xs text-muted-foreground">{item.skill} · {item.difficulty} · {item.source} · {item.at.slice(0, 10)}</p></div><span className="font-semibold">{item.percentage === null ? 'Practice log' : `${item.score}/${item.maxScore} (${item.percentage}%)`}</span></div>) : <p className="text-sm text-muted-foreground">No evidence recorded for this window.</p>}</CardContent></Card>
-  </>;
+
+    <section aria-label="Skill readiness" className="space-y-3">
+      <h2 className="text-lg font-semibold">Skills to focus on</h2>
+      <div className="readiness-skills">{report.skills.map(skill => <Card key={skill.key}><CardContent className="space-y-3 p-5">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{skill.label}</h3><span className="whitespace-nowrap text-lg font-semibold tabular-nums">{skill.score === null ? 'Not scored' : `${scoreText(skill.score)} / 10`}</span></div>
+        <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500" style={{ width: `${(skill.score || 0) * 10}%` }} /></div>
+        <p className="text-sm leading-6 text-muted-foreground">{skill.recommendation}</p>
+        <details className="border-t pt-3 text-sm"><summary className="cursor-pointer font-medium text-primary">Evidence and requirements</summary><div className="mt-3 space-y-3 text-muted-foreground">
+          <p>{skill.mandatory ? 'Required' : 'Optional'} · minimum {skill.minimum}/10 · {skill.recentSamples}/{report.policy.minSamples} recent independent evaluations.</p>
+          <p>First attempt average {scoreText(skill.firstAverage)} · latest {scoreText(skill.latestAverage)}. Last evaluated {skill.lastAt?.slice(0, 10) || 'Never'}.</p>
+          <div className="flex flex-wrap gap-2"><Badge variant="outline">{skill.trend}</Badge><Badge variant="outline">{skill.consistency}</Badge></div>
+          <div className="readiness-difficulties">{skill.difficulties.map(item => <div key={item.difficulty} className="min-w-0 rounded-lg bg-slate-50 p-3"><p className="capitalize">{item.difficulty}</p><p className="mt-1 font-semibold text-foreground">{item.score === null ? 'Not scored' : `${scoreText(item.score)} / 10`}</p><p className="mt-1 text-xs">{item.samples} evaluations</p></div>)}</div>
+        </div></details>
+      </CardContent></Card>)}</div>
+    </section>
+
+    <details className="rounded-xl border bg-white p-5">
+      <summary className="cursor-pointer text-base font-semibold">Learning activity and score history</summary>
+      <div className="readiness-charts mt-5">
+        <section className="min-w-0 rounded-lg border p-4"><h3 className="text-sm font-semibold">Readiness history</h3>
+          {report.history.some(point => point.overall !== null) ? <div className="mt-4 space-y-3">{report.history.map(point => <div key={point.at} className="flex min-w-0 items-center gap-3 text-sm"><time className="shrink-0 text-muted-foreground">{point.at.slice(0, 10)}</time><div className="h-2 min-w-0 flex-1 rounded-full bg-slate-100"><div className="h-full rounded-full bg-primary" style={{ width: `${(point.overall || 0) * 10}%` }} /></div><span className="w-10 text-right tabular-nums">{scoreText(point.overall)}</span></div>)}</div> : <p className="mt-4 text-sm text-muted-foreground">Graded assessments will build your history.</p>}
+        </section>
+        <section className="min-w-0 rounded-lg border p-4"><h3 className="text-sm font-semibold">Last 14 recorded learning days</h3>
+          {daily.length ? <div role="img" aria-label="Recorded learning minutes by day" className="mt-4 flex h-36 items-end gap-2">{daily.map(day => <div key={day.day} title={`${day.day} · ${day.minutes} min`} className="flex h-full min-w-0 flex-1 items-end"><div className="w-full rounded-t bg-indigo-400" style={{ height: `${Math.max(2, day.minutes / maximumMinutes * 100)}%` }} /></div>)}</div> : <p className="mt-4 text-sm text-muted-foreground">Your activity will appear as you study.</p>}
+          <p className="mt-3 text-xs text-muted-foreground">{activity.streak} day streak · times recorded in UTC.</p>
+        </section>
+      </div>
+    </details>
+
+    <details className="rounded-xl border bg-white p-5">
+      <summary className="cursor-pointer text-base font-semibold">Evidence records ({report.evidence.length})</summary>
+      <div className="mt-4 space-y-3">
+        {report.evidence.slice(0, evidenceLimit).map(item => <div key={item.id} className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 p-3 text-sm"><div className="min-w-0"><p className="break-words font-medium">{item.title}</p><p className="mt-1 break-words text-xs text-muted-foreground">{item.skill} · {item.difficulty} · {item.at.slice(0, 10)}</p></div><span className="shrink-0 font-medium">{item.percentage === null ? 'Practice log' : `${item.score}/${item.maxScore} · ${item.percentage}%`}</span></div>)}
+        {!report.evidence.length && <p className="text-sm text-muted-foreground">No evidence recorded in this window.</p>}
+        {report.evidence.length > evidenceLimit && <button type="button" className="min-h-11 text-sm font-medium text-primary underline" onClick={() => setEvidenceLimit(limit => limit + 10)}>Show 10 more records</button>}
+      </div>
+    </details>
+  </div>;
 }

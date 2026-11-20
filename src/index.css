@@ -100,6 +100,81 @@
   .student-shell {
     background: #f6f8fb;
   }
+
+  .workspace-shell {
+    background: radial-gradient(ellipse at 90% 0%, #e8edff 0%, transparent 36%), #f5f7fb;
+  }
+
+  .workspace-sidebar {
+    background: linear-gradient(170deg, #172846, #101c33 75%);
+    color: #f1f5f9;
+    border-color: #253650;
+  }
+
+  .workspace-sidebar > div {
+    border-color: #ffffff12;
+  }
+
+  .workspace-sidebar p.text-muted-foreground,
+  .workspace-sidebar p.text-xs {
+    color: #9dadc6;
+  }
+
+  .workspace-sidebar nav button {
+    min-height: 44px;
+    color: #bcc9dd;
+    border-radius: 10px;
+  }
+
+  .workspace-sidebar > div button {
+    color: #bdcbe0;
+  }
+
+  .workspace-sidebar > div button:hover {
+    color: white;
+    background: #ffffff0f;
+  }
+
+  .workspace-sidebar nav button:hover {
+    color: white;
+    background: #ffffff0b;
+  }
+
+  .workspace-sidebar nav button[aria-current="page"] {
+    color: white;
+    background: linear-gradient(100deg, #2563eb, #4f46e5);
+    box-shadow: 0 4px 16px #080d2126;
+  }
+
+  .readiness-metrics,
+  .readiness-skills,
+  .readiness-charts,
+  .readiness-difficulties {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .readiness-metrics {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  }
+
+  .readiness-skills {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  }
+
+  .readiness-charts {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr));
+  }
+
+  .readiness-difficulties {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 6rem), 1fr));
+    gap: 0.5rem;
+  }
+
+  details > summary {
+    list-style-position: outside;
+    margin-left: 1rem;
+  }
 }
 
 @layer base {

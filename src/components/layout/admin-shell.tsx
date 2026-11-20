@@ -32,14 +32,14 @@ export function AdminShell({
   onDismissToast: () => void;
 }) {
   return (
-    <main className="min-h-screen overflow-x-hidden bg-background">
+    <main className="workspace-shell min-h-screen overflow-x-hidden">
       {mobileMenuOpen ? (
         <button className="fixed inset-0 z-30 bg-foreground/35 backdrop-blur-[1px] lg:hidden" aria-label="Close navigation" onClick={onCloseMenu} />
       ) : null}
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-72 max-w-[86vw] border-r bg-white transition-transform lg:translate-x-0",
+          "workspace-sidebar fixed inset-y-0 left-0 z-40 w-72 max-w-[86vw] border-r bg-white transition-transform lg:translate-x-0",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -94,7 +94,7 @@ export function AdminShell({
             </Button>
           </div>
         </header>
-        <div className="space-y-5 p-3 pb-28 pt-20 sm:space-y-6 sm:p-4 sm:pb-28 sm:pt-20 md:p-6 md:pt-20 lg:pb-6">
+        <div className="mx-auto max-w-[1600px] space-y-5 p-3 pb-28 pt-20 sm:space-y-6 sm:p-4 sm:pb-28 sm:pt-20 md:p-6 md:pt-20 lg:pb-6">
           {!["Assessments", "Cohorts", "My Cohorts", "Groups", "My Groups"].includes(activeNav) && <Breadcrumbs items={[{ label: "Dashboard", onClick: activeNav !== "Dashboard" ? () => onChangeNav("Dashboard") : undefined }, ...(activeNav !== "Dashboard" ? [{ label: activeNav }] : [])]} />}{children}
         </div>
       </div>

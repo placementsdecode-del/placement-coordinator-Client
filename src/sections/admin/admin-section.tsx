@@ -250,7 +250,8 @@ export function AdminSection({
 
   if (activeNav === "Students") {
     return (
-      <><ResourcePanel resource={sectionsResource} label="Import cohorts"><BulkStudents sections={sections} onImported={refreshOrganizationUsers} /></ResourcePanel><ResourcePanel resource={usersResource} label="Students"><StudentsAdmin
+      <><ResourcePanel resource={usersResource} label="Students"><StudentsAdmin
+        tools={<ResourcePanel resource={sectionsResource} label="Import cohorts"><BulkStudents sections={sections} onImported={refreshOrganizationUsers} /></ResourcePanel>}
         canManage={currentUser?.role !== "teacher"}
         sections={sections}
         students={students}

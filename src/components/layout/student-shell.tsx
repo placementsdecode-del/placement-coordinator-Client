@@ -40,7 +40,7 @@ export function StudentShell({
   const trackingError = useLearningTracker(activeNav);
   const { data: community } = useCommunityData(getMySectionSummary);
   return (
-    <main className="min-h-screen overflow-x-hidden bg-background">
+    <main className="workspace-shell min-h-screen overflow-x-hidden">
       {mobileMenuOpen ? (
         <button
           className="fixed inset-0 z-30 bg-foreground/35 backdrop-blur-[1px] lg:hidden"
@@ -51,7 +51,7 @@ export function StudentShell({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 max-w-[86vw] border-r bg-white transition-[width,transform] lg:translate-x-0",
+          "workspace-sidebar fixed inset-y-0 left-0 z-40 max-w-[86vw] border-r bg-white transition-[width,transform] lg:translate-x-0",
           sidebarCollapsed ? "lg:w-20" : "w-72 lg:w-72",
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
         )}
@@ -120,7 +120,7 @@ export function StudentShell({
           </div>
         </header>
 
-        <div className="space-y-5 p-3 pb-28 pt-20 sm:space-y-6 sm:p-4 sm:pb-28 sm:pt-20 md:p-6 md:pt-20 lg:pb-6">{trackingError && <p role="status" className="text-sm text-amber-700">Learning-time sync failed. Check your connection.</p>}{!["Assessments", "Cohorts", "My Cohorts", "Groups", "My Groups"].includes(activeNav) && <Breadcrumbs items={[{ label: "Dashboard", onClick: activeNav !== "Dashboard" ? () => onChangeNav("Dashboard") : undefined }, ...(activeNav !== "Dashboard" ? [{ label: activeNav }] : [])]} />}{children}</div>
+        <div className="mx-auto max-w-[1600px] space-y-5 p-3 pb-28 pt-20 sm:space-y-6 sm:p-4 sm:pb-28 sm:pt-20 md:p-6 md:pt-20 lg:pb-6">{trackingError && <p role="status" className="text-sm text-amber-700">Learning-time sync failed. Check your connection.</p>}{!["Assessments", "Cohorts", "My Cohorts", "Groups", "My Groups"].includes(activeNav) && <Breadcrumbs items={[{ label: "Dashboard", onClick: activeNav !== "Dashboard" ? () => onChangeNav("Dashboard") : undefined }, ...(activeNav !== "Dashboard" ? [{ label: activeNav }] : [])]} />}{children}</div>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-white px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-10px_30px_rgba(31,41,55,0.08)] lg:hidden">

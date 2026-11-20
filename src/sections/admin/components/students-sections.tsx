@@ -2,13 +2,13 @@ import { ResourcePanel } from '@/components/common/resource-panel';
 import type { ResourceStatus } from '@/hooks/use-api-resource';
 import { getReadiness } from '@/services/readiness.api.service';
 import { useCommunityData } from '@/sections/community/use-community-data';
-import { ReadinessView } from '@/sections/readiness/readiness-view';
+import { scoreText } from '@/lib/utils';
 import { Breadcrumbs } from '@/components/common/breadcrumbs';
 import { InfoTip } from '@/components/common/info-tip';
 import type { ApiUser } from '@/types/api';
 import { addCohortMember, removeCohortMember } from '@/services/sections.api.service';
-import { useCallback, useState } from "react";
-import { Plus, UserPlus, Users } from "lucide-react";
+import { useCallback, useState, type ReactNode } from "react";
+import { ExternalLink, GraduationCap, Plus, UserPlus, Users } from "lucide-react";
 import { EmptyState } from "@/components/common/empty-state";
 import { SkeletonRows } from "@/components/common/loading-state";
 import { SectionIntro } from "@/components/common/section-intro";
@@ -32,23 +32,23 @@ export function StudentDetail({
   const [error, setError] = useState("");
 
   return (
-    <Card>
+    <Card id="student-detail" className="scroll-mt-24 self-start 2xl:sticky 2xl:top-24">
       <CardHeader>
         <CardTitle>Student Detail</CardTitle>
-        <CardDescription>Personal details, section, groups, progress, and pending work.</CardDescription>
+        <CardDescription>Contact details and a preparation snapshot.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-lg border bg-background p-4">
           {student ? (
             <>
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-lg font-bold">{student.name}</p>
-                  <p className="text-sm text-muted-foreground">{student.rollNo} · {student.section}</p>
+                  <p className="break-words text-lg font-bold">{student.name}</p>
+                  <p className="break-words text-sm text-muted-foreground">{student.rollNo} · {student.section}</p>
                 </div>
                 <Badge variant={student.status === "Active" ? "secondary" : "danger"}>{student.status}</Badge>
               </div>
-              <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+              <div className="mt-4 grid gap-2 break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">
                 <p>Email: {student.email}</p>
                 <p>Phone: {student.phone}</p>
                 {!!student.skills?.length && <p>Skills · {student.skills.join(', ')}</p>}
@@ -95,10 +95,28 @@ export function StudentDetail({
 function StudentProgress({ id }: { id: string }) {
   const load = useCallback(() => getReadiness({}, id), [id]);
   const { data, error, refresh } = useCommunityData(load);
-  return data ? <ReadinessView report={data} /> : error ? <p role="alert">{error} <button onClick={refresh}>Retry</button></p> : <p>Loading progress…</p>;
+  const base = window.location.pathname.startsWith('/teacher') ? '/teacher' : '/admin';
+  if (error) return <div className="rounded-lg border p-3 text-sm"><p role="alert">{error}</p><button className="mt-2 text-primary underline" onClick={refresh}>Retry progress</button></div>;
+  if (!data) return <SkeletonRows rows={2} />;
+  return <section aria-label="Preparation snapshot" className="space-y-3">
+    <div className="rounded-xl bg-slate-900 p-4 text-white">
+      <p className="text-sm text-slate-300">Placement readiness</p>
+      <div className="mt-2 flex flex-wrap items-end gap-2">
+        <p className="text-3xl font-semibold tabular-nums">{data.overall === null ? 'Awaiting results' : scoreText(data.overall)}</p>
+        {data.overall !== null && <span className="pb-1 text-sm text-slate-400">/ 10</span>}
+      </div>
+      <p className="mt-2 text-sm text-slate-300">{data.overall === null ? 'Graded assessments will build this score.' : data.status}</p>
+    </div>
+    <dl className="grid grid-cols-2 gap-3">
+      <div className="rounded-lg border p-3"><dt className="text-sm text-muted-foreground">Assessments</dt><dd className="mt-1 text-xl font-semibold tabular-nums">{data.activity.assessmentsCompleted}</dd></div>
+      <div className="rounded-lg border p-3"><dt className="text-sm text-muted-foreground">Awaiting review</dt><dd className="mt-1 text-xl font-semibold tabular-nums">{data.activity.pendingReview}</dd></div>
+    </dl>
+    <a className="flex min-h-11 items-center justify-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/5" href={`${base}/readiness?student=${encodeURIComponent(id)}`} target="_blank" rel="noopener noreferrer">Open full report<ExternalLink aria-hidden="true" className="h-4 w-4 shrink-0" /></a>
+  </section>;
 }
 
 export function StudentsAdmin({
+  tools,
   canManage = true,
   sections,
   students,
@@ -108,6 +126,7 @@ export function StudentsAdmin({
   onMoveStudent,
   loading,
 }: {
+  tools?: ReactNode;
   sections: SectionRow[];
   students: AdminStudentRow[];
   selectedStudent: AdminStudentRow | null;
@@ -136,7 +155,7 @@ export function StudentsAdmin({
   );
 
   return (
-    <>
+    <div className="space-y-5">
       <SectionIntro
         eyebrow="Students"
         title="Students"
@@ -148,16 +167,17 @@ export function StudentsAdmin({
           </Button> : null
         }
       />
+      {tools}
       {showCreate ? <CreateStudentForm sections={sections} onCreateStudent={onCreateStudent} /> : null}
-      <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+      <section className="grid min-w-0 items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card>
-          <CardHeader className="gap-3 md:flex-row md:items-center md:justify-between md:space-y-0">
+          <CardHeader className="flex-wrap gap-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
             <div>
               <CardTitle>Student directory</CardTitle>
-              <CardDescription>{filteredStudents.length} students in selected section.</CardDescription>
+              <CardDescription>{filteredStudents.length} {filteredStudents.length === 1 ? 'student' : 'students'}{sectionFilter !== 'all' ? ' in this cohort' : ' in your directory'}.</CardDescription>
             </div>
             <select
-              className="h-11 rounded-md border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm md:w-72"
+              className="h-11 w-full min-w-0 rounded-lg border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-ring sm:w-56"
               aria-label="Filter by cohort"
               value={sectionFilter}
               onChange={(event) => { setSectionFilter(event.target.value); setVisibleCount(50); }}
@@ -174,17 +194,21 @@ export function StudentsAdmin({
             {loading ? <SkeletonRows rows={4} /> : filteredStudents.length ? filteredStudents.slice(0, visibleCount).map((student) => (
               <button
                 key={student.id}
-                className={`grid w-full gap-3 rounded-lg border p-3 text-left md:grid-cols-[minmax(0,1fr)_180px_120px] md:items-center ${
-                  selectedStudent?.id === student.id ? "border-primary bg-primary/5" : "bg-white"
+                className={`group grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border p-3 text-left transition-colors sm:p-4 ${
+                  selectedStudent?.id === student.id ? "border-primary/50 bg-primary/5 ring-1 ring-primary/15" : "bg-white hover:border-primary/30 hover:bg-slate-50"
                 }`}
-                onClick={() => onSelectStudent(student.id)}
+                onClick={() => {
+                  onSelectStudent(student.id);
+                  if (window.innerWidth < 1536) window.requestAnimationFrame(() => {
+                    document.getElementById('student-detail')?.scrollIntoView({ block: 'start', behavior: 'auto' });
+                  });
+                }}
               >
-                <div className="min-w-0">
-                  <p className="font-semibold">{student.name}</p>
-                  <p className="text-sm text-muted-foreground">{student.rollNo} · {student.email}</p>
+                <div className="flex min-w-0 items-center gap-3">
+                  <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><GraduationCap className="h-5 w-5" /></span>
+                  <span className="min-w-0"><span className="block truncate font-semibold">{student.name}</span><span className="block truncate text-sm text-muted-foreground">{student.rollNo} · {student.email}</span><span className="mt-1 block truncate text-xs text-muted-foreground">{student.section}</span></span>
                 </div>
-                <span className="text-sm text-muted-foreground">{student.section}</span>
-                <Badge variant="outline">{student.status}</Badge>
+                <Badge variant={student.status === 'Active' ? 'secondary' : 'muted'}>{student.status}</Badge>
               </button>
             )) : (
               <EmptyState icon={Users} title={students.length ? "No matching students" : "No students yet"} description={students.length ? "Try a different search or section filter." : "Add your first student and assign a section when ready."} />
@@ -194,7 +218,7 @@ export function StudentsAdmin({
         </Card>
         <StudentDetail student={selectedStudent} sections={sections} onMoveStudent={onMoveStudent} />
       </section>
-    </>
+    </div>
   );
 }
 
@@ -223,6 +247,6 @@ export function SectionsAdmin({ sections, students, onCreateSection, onUpdateSec
       {editing && <CreateSectionForm initialSection={cohort} onCreateSection={async s => { await onUpdateSection(s); setEditing(false); }} />}
       {adding && <ResourcePanel resource={studentsStatus} label="Available students"><Card><CardContent className="space-y-4 p-5"><form className="flex flex-wrap gap-2" onSubmit={e => { e.preventDefault(); void run(async () => { await addCohortMember(cohort.id, assignId); await onRefresh(); setAssignId(''); }); }}><select aria-label="Student to add" className="h-11 min-w-0 flex-1 rounded-md border px-3" value={assignId} onChange={e => setAssignId(e.target.value)}><option value="">Select a student</option>{students.filter(s => !belongs(s)).map(s => <option key={s.id} value={s.id}>{s.name} · {s.rollNo}</option>)}</select><Button disabled={pending || !assignId}>Add to cohort</Button><InfoTip text="Students can join multiple cohorts. Adding a student here keeps their existing memberships." /></form>{canManage && <CreateStudentForm sections={sections} initialSectionId={cohort.id} embedded onCreateStudent={onCreateStudent} />}</CardContent></Card></ResourcePanel>}
       <ResourcePanel resource={studentsStatus} label="Participants"><h2 className="font-semibold">Participants ({members.length})</h2><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{members.map(s => <Card key={s.id}><CardContent className="p-4"><button className="w-full text-left" onClick={() => setStudentId(s.id)}><p className="font-semibold">{s.name}</p><p className="text-sm text-muted-foreground">{s.rollNo}</p></button><Button variant="ghost" disabled={pending} className="mt-2" onClick={() => void run(async () => { await removeCohortMember(cohort.id, s.id); await onRefresh(); })}>Remove from cohort</Button></CardContent></Card>)}</div>{!members.length && <p className="text-muted-foreground">No participants yet. Add students to this cohort.</p>}</ResourcePanel>
-    </> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{sections.map(s => <button key={s.id} onClick={() => setOpened(s.id)} className="rounded-xl border bg-white p-5 text-left hover:border-primary"><h2 className="font-semibold">{s.name}</h2><p className="mt-2 text-sm text-muted-foreground">{s.description}</p><p className="mt-3 text-sm">{studentsStatus.initialized ? students.filter(u => u.sectionId === s.id || u.cohortIds?.includes(s.id)).length : "…"} participants · {s.status}</p><p className="mt-1 text-xs text-muted-foreground">{s.coordinator}</p></button>)}</div>}
+    </> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{sections.map(s => <button key={s.id} onClick={() => setOpened(s.id)} className="rounded-xl border bg-white p-5 text-left hover:border-primary"><h2 className="font-semibold">{s.name}</h2><p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{s.description}</p><p className="mt-3 text-sm">{studentsStatus.initialized ? students.filter(u => u.sectionId === s.id || u.cohortIds?.includes(s.id)).length : "…"} participants · {s.status}</p><p className="mt-1 text-xs text-muted-foreground">{s.coordinator}</p></button>)}</div>}
   </>;
 }

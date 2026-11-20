@@ -278,7 +278,7 @@ function App() {
         onLogout={logout}
         onDismissToast={() => setToastMessage("")}
       >
-        <Suspense fallback={<PageSkeleton />}>{activeAdminNav === "Readiness" ? <><CoordinatorReadiness /><CohortLeaderboard /></> : <AdminSection activeNav={activeAdminNav} currentUser={currentUser} onAction={showToast} />}</Suspense>
+        <Suspense fallback={<PageSkeleton />}>{activeAdminNav === "Readiness" ? <><CoordinatorReadiness />{!new URLSearchParams(window.location.search).has("student") && <CohortLeaderboard />}</> : <AdminSection activeNav={activeAdminNav} currentUser={currentUser} onAction={showToast} />}</Suspense>
       </AdminShell>
     );
   }

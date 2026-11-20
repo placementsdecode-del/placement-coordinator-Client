@@ -1,3 +1,4 @@
+import { ExpandableText } from '@/components/common/expandable-text';
 import { WorkReviews } from './work-reviews';
 import { ResourcePanel } from '@/components/common/resource-panel';
 import type { ResourceStatus } from '@/hooks/use-api-resource';
@@ -27,6 +28,6 @@ export function WorkAdmin({ sections, sectionsStatus, initialKind = 'task' }: { 
       <div className="flex gap-2"><Button variant="outline" type="submit" value="draft" disabled={!audience.length || pending}>Save draft</Button><Button type="submit" value="published" disabled={!audience.length || pending}>{pending ? 'Saving…' : 'Publish and notify'}</Button></div>
     </fieldset></form></CardContent></Card>
     {actionError && <p role="alert" className="text-destructive">{actionError}</p>}{message && <p role="status" className="text-primary">{message}</p>}
-    {data?.work.map(item => <Card key={item._id}><CardHeader><CardTitle>{item.title}</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{item.kind} · {item.status} · {item.assignedSections?.map(section => `${section.name} (${section.code})`).join(', ')}</p><p className="my-3 whitespace-pre-wrap">{item.instructions}</p>{item.status === 'published' && item.kind !== 'announcement' && <Button variant="outline" onClick={() => setReviewing(reviewing === item._id ? '' : item._id)}>{reviewing === item._id ? 'Close responses' : 'View responses'}</Button>}{reviewing === item._id && <WorkReviews workId={item._id} />}{item.status === 'draft' && <Button disabled={pending} onClick={() => void save(() => publishWork(item._id))}>Publish and notify</Button>}</CardContent></Card>)}
+    {data?.work.map(item => <Card key={item._id}><CardHeader><CardTitle>{item.title}</CardTitle></CardHeader><CardContent><p className="text-sm text-muted-foreground">{item.kind} · {item.status} · {item.assignedSections?.map(section => `${section.name} (${section.code})`).join(', ')}</p><div className="my-3"><ExpandableText text={item.instructions} label="instructions" /></div>{item.status === 'published' && item.kind !== 'announcement' && <Button variant="outline" onClick={() => setReviewing(reviewing === item._id ? '' : item._id)}>{reviewing === item._id ? 'Close responses' : 'View responses'}</Button>}{reviewing === item._id && <WorkReviews workId={item._id} />}{item.status === 'draft' && <Button disabled={pending} onClick={() => void save(() => publishWork(item._id))}>Publish and notify</Button>}</CardContent></Card>)}
   </>;
 }

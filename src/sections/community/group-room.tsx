@@ -1,3 +1,4 @@
+import { ExpandableText } from '@/components/common/expandable-text';
 import { useCallback, useEffect, useState } from 'react';
 import { listGroupMessages, sendGroupMessage } from '@/services/groups.api.service';
 import { useCommunityData } from './use-community-data';
@@ -49,7 +50,7 @@ export function GroupRoom({ group, onBack }: { group: StudentGroup; onBack: () =
 
   return <div className="space-y-4">
     <Breadcrumbs items={[{ label: group.kind === 'practice' ? 'Self-Assessment' : 'Groups', onClick: onBack }, { label: group.name }]} />
-    <Card><CardHeader><CardTitle>{group.name}</CardTitle><p className="whitespace-pre-wrap text-sm text-muted-foreground">{group.description}</p></CardHeader><CardContent>
+    <Card><CardHeader><CardTitle>{group.name}</CardTitle><ExpandableText text={group.description} label="description" /></CardHeader><CardContent>
       <details><summary className="cursor-pointer text-sm font-medium">Participants ({group.participants.filter(member => member.status === 'accepted').length}) · Coordinators ({group.coordinators?.length || 0})</summary>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {group.coordinators?.map(person => <div key={person._id} className="rounded-lg border p-3 text-sm">{person.name}<p className="text-xs text-muted-foreground">Coordinator</p></div>)}

@@ -13,6 +13,14 @@ import { FilterBar, ReadinessView, selectClass } from './readiness-view';
 import { EvidenceForm } from './evidence-form';
 import { PolicyEditor } from './policy-editor';
 export function CoordinatorReadiness() {
+  const [studentId, setStudentId] = useState(() => new URLSearchParams(window.location.search).get('student') || '');
+  return studentId ? <StudentDrilldown studentId={studentId} query={{ months: '3' }} onBack={() => {
+    window.history.replaceState({}, '', window.location.pathname);
+    setStudentId('');
+  }} /> : <ReadinessDirectory />;
+}
+
+function ReadinessDirectory() {
   const [query, setQuery] = useState<ReadinessQuery>({ months: '3' }); const [tab, setTab] = useState('Overview'); const [selected, setSelected] = useState('');
   const [search, setSearch] = useState(''); const [readiness, setReadiness] = useState(''); const [department, setDepartment] = useState(''); const [batch, setBatch] = useState(''); const [skill, setSkill] = useState(''); const [minimum, setMinimum] = useState(''); const [eligible, setEligible] = useState('');
   useEffect(() => {
@@ -53,7 +61,7 @@ function StudentDrilldown({ studentId, query, onBack }: { studentId: string; que
   const { data, loading, error, refresh } = useCommunityData(load);
   if (!data && loading) return <PageSkeleton label="Loading student evidence" />;
   if (error || !data) return <LoadError message={error || 'Unable to load student'} onRetry={refresh} />;
-  return <div className="space-y-4"><Button variant="outline" onClick={onBack}>Back to candidates</Button><h2 className="text-2xl font-semibold">{data.student.name}</h2><ReadinessView report={data} /><DecisionForms report={data} query={query} onSaved={refresh} />
+  return <div className="space-y-4"><Button variant="outline" onClick={onBack}>Back to candidates</Button><h1 className="text-2xl font-semibold">{data.student.name}</h1><ReadinessView report={data} /><DecisionForms report={data} query={query} onSaved={refresh} />
     <Card><CardHeader><CardTitle>Decision history</CardTitle></CardHeader><CardContent className="space-y-3">{data.decisions.length ? data.decisions.map(decision => <div key={decision._id} className="rounded-md border p-3"><p className="font-semibold">{decision.decision}</p><p>{decision.reason}</p><p className="text-xs text-muted-foreground">{decision.recordedBy?.name || 'Coordinator'} · {new Date(decision.createdAt).toLocaleString()}</p></div>) : <p className="text-sm text-muted-foreground">No coordinator decision recorded for this policy version.</p>}</CardContent></Card>
   </div>;
 }
